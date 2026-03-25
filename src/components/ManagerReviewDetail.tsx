@@ -13,7 +13,10 @@ import {
   MoreVertical,
   ShieldCheck,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Calendar,
+  Clock,
+  Zap
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -52,13 +55,20 @@ The future is not human vs AI, but human + AI. The founders who win are those wh
 export default function ManagerReviewDetail() {
   const [feedback, setFeedback] = useState("");
   const [activeTab, setActiveTab] = useState<"content" | "preview" | "history">("content");
+  const [approvalMode, setApprovalMode] = useState<"none" | "approve" | "revision" | "reject">("none");
+  const [publishType, setPublishType] = useState<"immediate" | "schedule">("immediate");
+  const [publishDate, setPublishDate] = useState("");
+
+  const handleAction = (mode: "approve" | "revision" | "reject") => {
+    setApprovalMode(mode);
+  };
 
   return (
     <div className="space-y-10 pb-20">
       {/* 1. Breadcrumbs & Header Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/manager" className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-light-grey bg-white text-brand-grey transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
+          <Link href="/manager/review" className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-light-grey bg-white text-brand-grey transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
             <ChevronLeft size={20} />
           </Link>
           <div className="space-y-1">
@@ -76,10 +86,7 @@ export default function ManagerReviewDetail() {
         <div className="flex items-center gap-3">
           <button className="flex h-10 items-center justify-center gap-2 rounded-xl border border-brand-light-grey bg-white px-5 text-xs font-black uppercase tracking-widest text-brand-grey transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
             <ExternalLink size={16} />
-            <span>View Creator Profile</span>
-          </button>
-          <button className="flex h-10 items-center justify-center rounded-xl border border-brand-light-grey bg-white px-3 text-brand-grey transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
-            <MoreVertical size={20} />
+            <span className="hidden sm:inline">View Profile</span>
           </button>
         </div>
       </div>
@@ -87,22 +94,17 @@ export default function ManagerReviewDetail() {
       <div className="grid gap-10 lg:grid-cols-3">
         {/* 2. Left Column: Draft Content & Previews */}
         <div className="lg:col-span-2 space-y-8">
-           {/* Tab Switcher */}
            <div className="flex gap-2 rounded-2xl bg-brand-light p-1.5 dark:bg-white/5 w-fit">
               <TabButton active={activeTab === "content"} onClick={() => setActiveTab("content")}>Draft Content</TabButton>
               <TabButton active={activeTab === "preview"} onClick={() => setActiveTab("preview")}>Platform Previews</TabButton>
-              <TabButton active={activeTab === "history"} onClick={() => setActiveTab("history")}>Version History</TabButton>
+              <TabButton active={activeTab === "history"} onClick={() => setActiveTab("history")}>History</TabButton>
            </div>
 
-           {/* Main Content Area */}
-           <div className="min-h-[600px] rounded-[2.5rem] border border-brand-light-grey bg-white p-12 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
+           <div className="min-h-[500px] rounded-[2.5rem] border border-brand-light-grey bg-white p-8 md:p-12 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
               {activeTab === "content" && (
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <div className="mb-10 flex items-center justify-between border-b border-brand-light-grey pb-6 dark:border-brand-dark/20">
-                     <div className="flex items-center gap-4">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Reading Time: ~2m</span>
-                       <span className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Drafted by: {mockDraft.creator}</span>
-                     </div>
+                     <span className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Reading Time: ~2m</span>
                      <ShieldCheck size={20} className="text-green-500" />
                   </div>
                   <div className="whitespace-pre-wrap font-body text-base leading-relaxed text-brand-dark dark:text-brand-light">
@@ -129,15 +131,12 @@ export default function ManagerReviewDetail() {
               {activeTab === "history" && (
                 <div className="space-y-6">
                   {mockDraft.versions.map((v, i) => (
-                    <div key={v.id} className="flex items-start gap-6 rounded-2xl border border-brand-light-grey p-6 dark:border-brand-dark/20">
-                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-light dark:bg-white/10 text-[10px] font-black font-heading">
-                         {mockDraft.versions.length - i}
-                       </div>
-                       <div className="flex-1 space-y-1">
+                    <div key={v.id} className="flex items-start gap-4 rounded-2xl border border-brand-light-grey p-6 dark:border-brand-dark/20">
+                       <span className="text-[10px] font-black font-heading bg-brand-light dark:bg-white/10 p-2 rounded-lg">{mockDraft.versions.length - i}</span>
+                       <div className="flex-1">
                           <p className="text-sm font-bold text-brand-dark dark:text-brand-light font-heading">{v.content}</p>
                           <p className="text-[10px] font-bold text-brand-grey font-body uppercase tracking-widest">{v.date} • {v.status}</p>
                        </div>
-                       <button className="text-xs font-black uppercase tracking-widest text-brand-orange">Restore</button>
                     </div>
                   ))}
                 </div>
@@ -145,51 +144,127 @@ export default function ManagerReviewDetail() {
            </div>
         </div>
 
-        {/* 3. Right Column: Review Panel */}
+        {/* 3. Right Column: Decision & Feedback */}
         <div className="space-y-8">
-           <div className="rounded-[2.5rem] bg-brand-dark p-10 text-white shadow-2xl shadow-brand-dark/40 dark:bg-white/5 dark:border dark:border-brand-dark/20">
+           <div className="rounded-[2.5rem] border border-brand-light-grey bg-white p-10 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5 overflow-hidden relative">
               <div className="mb-8 flex items-center gap-3">
-                 <MessageSquare size={24} className="text-brand-orange" />
-                 <h3 className="text-xl font-black uppercase tracking-tighter font-heading">Decision Panel</h3>
+                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-dark text-white dark:bg-brand-orange">
+                    <Zap size={20} />
+                 </div>
+                 <h3 className="text-xl font-black uppercase tracking-tighter font-heading text-brand-dark dark:text-brand-light">Decision Panel</h3>
               </div>
 
-              <div className="space-y-6">
-                <div>
-                   <label className="mb-3 block text-[10px] font-black uppercase tracking-widest text-white/50 font-heading leading-none">Internal Feedback</label>
-                   <textarea 
-                      placeholder="Add specific comments for Julian..." 
-                      className="min-h-[160px] w-full rounded-2xl bg-white/10 p-5 text-sm font-medium text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-brand-orange transition-all"
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
-                   />
-                </div>
-
-                <div className="space-y-3 pb-4">
-                   <label className="block text-[10px] font-black uppercase tracking-widest text-white/50 font-heading leading-none">Global Actions</label>
-                   <button className="flex w-full items-center justify-center gap-3 rounded-2xl bg-green-500 py-4 text-xs font-black uppercase tracking-widest text-white transition-transform active:scale-95 shadow-lg shadow-green-500/20">
+              {approvalMode === "none" ? (
+                <div className="space-y-4">
+                   <button 
+                      onClick={() => handleAction("approve")}
+                      className="flex w-full items-center justify-center gap-3 rounded-2xl bg-green-500 py-4 text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg shadow-green-500/20"
+                   >
                       <CheckCircle2 size={16} />
-                      Final Approval
+                      Approve Draft
                    </button>
-                   <button className="flex w-full items-center justify-center gap-3 rounded-2xl bg-brand-orange py-4 text-xs font-black uppercase tracking-widest text-white transition-transform active:scale-95 shadow-lg shadow-brand-orange/20">
+                   <button 
+                      onClick={() => handleAction("revision")}
+                      className="flex w-full items-center justify-center gap-3 rounded-2xl bg-brand-orange py-4 text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg shadow-brand-orange/20"
+                   >
                       <Reply size={16} />
-                      Request Revisions
+                      Request Revision
                    </button>
-                   <button className="flex w-full items-center justify-center gap-3 rounded-2xl bg-white/5 py-4 text-xs font-black uppercase tracking-widest text-white/50 border border-white/10 transition-all hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20">
+                   <button 
+                      onClick={() => handleAction("reject")}
+                      className="flex w-full items-center justify-center gap-3 rounded-2xl border border-brand-light-grey bg-white py-4 text-xs font-black uppercase tracking-widest text-brand-grey transition-all hover:bg-red-50 text-red-500 hover:border-red-200 dark:bg-white/5 dark:border-brand-dark/20"
+                   >
                       <XCircle size={16} />
                       Reject Draft
                    </button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-6">
+                   {/* Comments Field (Mandatory for Revision/Reject) */}
+                   {(approvalMode === "revision" || approvalMode === "reject") && (
+                     <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Why is this {approvalMode}ed? *</label>
+                        <textarea 
+                           className="min-h-[140px] w-full rounded-2xl bg-brand-light p-5 text-sm font-medium text-brand-dark placeholder:text-brand-grey focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 dark:text-brand-light border border-transparent focus:border-brand-orange transition-all"
+                           placeholder="Enter your feedback for the content manager..."
+                           value={feedback}
+                           onChange={(e) => setFeedback(e.target.value)}
+                        />
+                     </div>
+                   )}
+
+                   {/* Approval Scheduling */}
+                   {approvalMode === "approve" && (
+                     <div className="space-y-6">
+                        <div className="space-y-3">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Publishing Strategy</label>
+                           <div className="grid grid-cols-2 gap-3">
+                              <button 
+                                 onClick={() => setPublishType("immediate")}
+                                 className={cn(
+                                   "flex flex-col items-center gap-2 rounded-2xl border p-4 transition-all",
+                                   publishType === "immediate" ? "border-brand-dark bg-brand-light shadow-inner dark:border-brand-orange dark:bg-brand-orange/10" : "border-brand-light-grey bg-white dark:border-brand-dark/20 dark:bg-white/5"
+                                 )}
+                              >
+                                 <Zap size={16} className={publishType === "immediate" ? "text-brand-orange" : "text-brand-grey"} />
+                                 <span className="text-[9px] font-black uppercase tracking-widest">Immediate</span>
+                              </button>
+                              <button 
+                                 onClick={() => setPublishType("schedule")}
+                                 className={cn(
+                                   "flex flex-col items-center gap-2 rounded-2xl border p-4 transition-all",
+                                   publishType === "schedule" ? "border-brand-dark bg-brand-light shadow-inner dark:border-brand-orange dark:bg-brand-orange/10" : "border-brand-light-grey bg-white dark:border-brand-dark/20 dark:bg-white/5"
+                                 )}
+                              >
+                                 <Calendar size={16} className={publishType === "schedule" ? "text-brand-orange" : "text-brand-grey"} />
+                                 <span className="text-[9px] font-black uppercase tracking-widest">Schedule</span>
+                              </button>
+                           </div>
+                        </div>
+
+                        {publishType === "schedule" && (
+                          <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Select Date & Time</label>
+                             <input 
+                                type="datetime-local" 
+                                className="w-full rounded-2xl bg-brand-light p-4 text-sm font-bold text-brand-dark focus:outline-none dark:bg-white/5 dark:text-brand-light border border-brand-light-grey dark:border-brand-dark/20"
+                                value={publishDate}
+                                onChange={(e) => setPublishDate(e.target.value)}
+                             />
+                          </div>
+                        )}
+                     </div>
+                   )}
+
+                   {/* Confirm Button */}
+                   <div className="flex flex-col gap-3 pt-6">
+                      <button className={cn(
+                        "w-full rounded-2xl py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all active:scale-95",
+                        approvalMode === "approve" ? "bg-green-500 shadow-green-500/20" : 
+                        approvalMode === "revision" ? "bg-brand-orange shadow-brand-orange/20" :
+                        "bg-red-500 shadow-red-500/20"
+                      )}>
+                         Confirm {approvalMode}
+                      </button>
+                      <button 
+                         onClick={() => setApprovalMode("none")}
+                         className="w-full text-[10px] font-black uppercase tracking-widest text-brand-grey hover:text-brand-dark"
+                      >
+                         Cancel Action
+                      </button>
+                   </div>
+                </div>
+              )}
            </div>
 
-           {/* Metrics Quick Check */}
+           {/* SEO Check Card */}
            <div className="rounded-[2.5rem] border border-brand-light-grey bg-white p-8 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
-              <h4 className="mb-6 text-sm font-black uppercase tracking-widest text-brand-dark dark:text-brand-light font-heading">Automated SEO Pass</h4>
+              <h4 className="mb-6 text-[10px] font-black uppercase tracking-widest text-brand-dark dark:text-brand-light font-heading">System Verification</h4>
               <div className="space-y-4">
-                 <MetricRow label="Title Length" value="Optimal" status="good" />
-                 <MetricRow label="Readability Index" value="High" status="good" />
-                 <MetricRow label="Keyword Density" value="Targeted" status="good" />
-                 <MetricRow label="Competitor Gap" value="Strong" status="good" />
+                 <MetricRow label="H1 Structure" value="Verified" status="good" />
+                 <MetricRow label="Section Density" value="Optimal" status="good" />
+                 <MetricRow label="Reading Score" value="78/100" status="good" />
+                 <MetricRow label="Keyword Pass" value="92%" status="good" />
               </div>
            </div>
         </div>
@@ -215,7 +290,7 @@ function TabButton({ children, active, onClick }: { children: React.ReactNode, a
 function MetricRow({ label, value, status }: { label: string, value: string, status: "good" | "warning" | "error" }) {
   return (
     <div className="flex items-center justify-between border-b border-brand-light-grey pb-3 last:border-0 dark:border-brand-dark/20">
-      <span className="text-[10px] font-bold text-brand-grey font-body uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] font-bold text-brand-grey font-body capitalize">{label}</span>
       <div className="flex items-center gap-2">
          <div className={cn("h-1.5 w-1.5 rounded-full", status === "good" ? "bg-green-500" : "bg-orange-500")} />
          <span className="text-xs font-black text-brand-dark dark:text-brand-light font-heading">{value}</span>
@@ -228,12 +303,10 @@ function PlatformPreview({ platform, icon: Icon, content }: { platform: string, 
   return (
     <div className="space-y-4">
        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-light dark:bg-white/10">
-            <Icon size={16} strokeWidth={2.5} className="text-brand-dark dark:text-brand-light" />
-          </div>
+          <Icon size={16} className="text-brand-dark dark:text-brand-light" />
           <span className="text-xs font-black uppercase tracking-widest text-brand-dark dark:text-brand-light font-heading">{platform} Preview</span>
        </div>
-       <div className="rounded-2xl border border-brand-light-grey bg-brand-light p-6 dark:border-brand-dark/20 dark:bg-white/5">
+       <div className="rounded-2xl border border-brand-light-grey bg-brand-light/50 p-6 dark:border-brand-dark/20 dark:bg-white/5">
           <p className="whitespace-pre-wrap font-body text-sm leading-relaxed text-brand-dark dark:text-brand-light opacity-80">{content}</p>
        </div>
     </div>
