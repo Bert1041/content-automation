@@ -1,22 +1,30 @@
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
-import CreateContentForm from "@/components/CreateContentForm";
+"use client";
+
+import Sidebar from "@/components/common/Sidebar";
+import Header from "@/components/common/Header";
+import CreateContentForm from "@/components/content-manager/CreateContentForm";
+import { useLayout } from "@/components/common/LayoutContext";
+import { cn } from "@/lib/utils";
 
 export default function CreateContentPage() {
+  const { sidebarCollapsed } = useLayout();
   return (
-    <div className="flex min-h-screen bg-brand-light dark:bg-brand-dark">
+    <div className="flex min-h-screen bg-brand-light dark:bg-brand-dark overflow-hidden">
       <Sidebar />
       
-      <main className="flex-1 pl-64 transition-all duration-300">
+      <main className={cn(
+        "flex-1 transition-all duration-500 ease-in-out",
+        sidebarCollapsed ? "lg:pl-24" : "lg:pl-[20rem]"
+      )}>
         <Header />
         
-        <div className="mx-auto max-w-5xl space-y-10 p-10">
+        <div className="mx-auto max-w-7xl p-6 lg:p-10 space-y-10">
           {/* Page Header */}
           <div className="space-y-1">
-            <h2 className="text-3xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+            <h2 className="text-3xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading">
               Create New Content
             </h2>
-            <p className="text-sm font-medium text-brand-grey font-body">
+            <p className="text-sm font-normal text-brand-grey font-body">
               Configure your source material and AI settings to generate platform-optimized drafts.
             </p>
           </div>

@@ -1,73 +1,68 @@
 ---
 name: brand-guidelines
-description: Applies Anthropic's official brand colors and typography to any sort of artifact that may benefit from having Anthropic's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply.
+description: Applies Fetemi's official brand colors and typography to any sort of artifact that may benefit from having Fetemi's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply.
 license: Complete terms in LICENSE.txt
 ---
 
-# Anthropic Brand Styling
+# Fetemi Brand Styling
 
 ## Overview
 
-To access Anthropic's official brand identity and style resources, use this skill.
+To access Fetemi's official brand identity and style resources, use this skill. 
 
-**Keywords**: branding, corporate identity, visual identity, post-processing, styling, brand colors, typography, Anthropic brand, visual formatting, visual design
+**Keywords**: branding, corporate identity, visual identity, post-processing, styling, brand colors, typography, Fetemi brand, visual formatting, visual design, glassmorphism
 
 ## Brand Guidelines
+
+### Aesthetics
+- **Core Aesthetic**: Soft Glassmorphism / Luxury Refined
+- **Key Traits**: Premium, soft glows, heavily rounded corners (`rounded-[2.5rem]`), elegant floating elements. No harsh borders or high-contrast brutalism.
 
 ### Colors
 
 **Main Colors:**
 
-- Dark: `#141413` - Primary text and dark backgrounds
-- Light: `#faf9f5` - Light backgrounds and text on dark
-- Mid Gray: `#b0aea5` - Secondary elements
-- Light Gray: `#e8e6dc` - Subtle backgrounds
+- Dark: `#0f172a` (Slate 900) - Primary text (on light), dark backgrounds
+- Light: `#fafafa` (Zinc 50) - Light backgrounds and text (on dark)
+- Mid Gray: `#94a3b8` (Slate 400) - Secondary elements
+- Light Gray: `#e2e8f0` (Slate 200) - Subtle borders/backgrounds
 
 **Accent Colors:**
 
-- Orange: `#d97757` - Primary accent
-- Blue: `#6a9bcc` - Secondary accent
-- Green: `#788c5d` - Tertiary accent
+- Primary Violet: `#8b5cf6` (Violet 500)
+- Secondary Light Violet: `#a78bfa` (Violet 400)
+- Gradients: Soft meshed gradients fading between white/transparent and soft violet/indigo.
 
 ### Typography
 
-- **Headings**: Poppins (with Arial fallback)
-- **Body Text**: Lora (with Georgia fallback)
-- **Note**: Fonts should be pre-installed in your environment for best results
+- **Headings**: Outfit (sans-serif)
+- **Body Text**: Manrope (sans-serif)
+- **Weights**: Focus heavily on `font-medium` and `font-normal`. Avoid aggressive heavy fonts like `font-black` or `font-bold`.
 
 ## Features
 
 ### Smart Font Application
 
-- Applies Poppins font to headings (24pt and larger)
-- Applies Lora font to body text
-- Automatically falls back to Arial/Georgia if custom fonts unavailable
-- Preserves readability across all systems
+- Applies Outfit font to headings
+- Applies Manrope font to body text
+- Maintains an airy, highly legible typographical hierarchy using medium/regular weights.
 
 ### Text Styling
 
-- Headings (24pt+): Poppins font
-- Body text: Lora font
-- Smart color selection based on background
-- Preserves text hierarchy and formatting
+- Headings: Outfit font, medium weight.
+- Body text: Manrope font, regular weight.
+- Smart color selection based on background to maintain premium legibility.
 
-### Shape and Accent Colors
+### UI Components & Shapes
 
-- Non-text shapes use accent colors
-- Cycles through orange, blue, and green accents
-- Maintains visual interest while staying on-brand
+- **Glass Cards**: `.glass-card` (`bg-white/60`, `backdrop-blur-xl`, `border border-white/40`, soft shadows).
+- **Rounding**: Massive border radii (e.g., `rounded-[2.5rem]`, `rounded-2xl`).
+- **Layouts**: Floating elements with generous margins (e.g., floating sidebars, pill headers).
 
 ## Technical Details
 
-### Font Management
+### Framework Context
 
-- Uses system-installed Poppins and Lora fonts when available
-- Provides automatic fallback to Arial (headings) and Georgia (body)
-- No font installation required - works with existing system fonts
-- For best results, pre-install Poppins and Lora fonts in your environment
-
-### Color Application
-
-- Uses RGB color values for precise brand matching
-- Applied via python-pptx's RGBColor class
-- Maintains color fidelity across different systems
+- Built on top of Tailwind CSS.
+- Heavily uses CSS variables and Tailwind utility extensions (like `.glass-card`).
+- Employs smooth animations (`animate-fade-in-up`, slow duration `500ms` transitions) rather than immediate snaps.

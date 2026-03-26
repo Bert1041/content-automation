@@ -2,66 +2,56 @@
 
 import { 
   Search, 
-  Filter, 
   Calendar, 
-  Clock, 
-  User, 
   ChevronRight,
   Linkedin,
   Twitter,
   Mail,
-  MoreVertical,
-  CheckCircle2,
-  XCircle,
   AlertCircle
 } from "lucide-react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/utils";
+import { Draft } from "@/types/content";
 import Link from "next/link";
 import { useState } from "react";
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-const mockDrafts = [
+const mockDrafts: Draft[] = [
   { 
     id: "DR-123", 
     title: "Why Founders need AI to scale marketing in 2026", 
     creator: "Julian V.", 
-    platforms: ["Linkedin", "Twitter"], 
+    platforms: ["linkedin", "twitter"], 
     status: "Pending Review", 
     submitted: "2 hours ago",
-    estPublish: "Mar 26, 2026",
+    estPublishDate: "Mar 26, 2026",
     urgent: true
-  },
+  } as unknown as Draft,
   { 
     id: "DR-124", 
     title: "N8N Workflows for advanced content creators", 
     creator: "Elena R.", 
-    platforms: ["Email"], 
+    platforms: ["email"], 
     status: "Pending Review", 
     submitted: "5 hours ago",
-    estPublish: "Mar 27, 2026"
-  },
+    estPublishDate: "Mar 27, 2026"
+  } as unknown as Draft,
   { 
     id: "DR-125", 
     title: "10 tips for SEO optimization with LLMs", 
     creator: "Marcus K.", 
-    platforms: ["Twitter"], 
+    platforms: ["twitter"], 
     status: "Rejected", 
     submitted: "1 day ago",
-    estPublish: "N/A"
-  },
+    estPublishDate: "N/A"
+  } as unknown as Draft,
   { 
     id: "DR-126", 
     title: "The Future of SaaS Design", 
     creator: "Alice W.", 
-    platforms: ["Linkedin", "Email"], 
+    platforms: ["linkedin", "email"], 
     status: "Approved", 
     submitted: "2 days ago",
-    estPublish: "Mar 25, 2026"
-  },
+    estPublishDate: "Mar 25, 2026"
+  } as unknown as Draft,
 ];
 
 export default function ReviewQueueContent() {
@@ -80,10 +70,10 @@ export default function ReviewQueueContent() {
                   key={status}
                   onClick={() => setStatusFilter(status)}
                   className={cn(
-                    "rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all",
+                    "rounded-xl px-4 py-2 text-[10px] font-semibold uppercase tracking-wider transition-all",
                     statusFilter === status 
                       ? "bg-brand-dark text-white dark:bg-brand-orange shadow-lg shadow-brand-dark/10" 
-                      : "text-brand-grey hover:bg-brand-light dark:hover:bg-white/5"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-brand-light dark:hover:bg-white/5"
                   )}
                 >
                   {status}
@@ -92,7 +82,7 @@ export default function ReviewQueueContent() {
            </div>
 
            {/* Platform Filter */}
-           <select className="rounded-2xl border border-brand-light-grey bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-brand-dark focus:outline-none dark:border-brand-dark/20 dark:bg-white/5 dark:text-brand-light">
+           <select className="rounded-2xl border border-brand-light-grey bg-white px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-brand-dark focus:outline-none dark:border-brand-dark/20 dark:bg-white/5 dark:text-brand-light">
               <option>All Platforms</option>
               <option>LinkedIn</option>
               <option>X (Twitter)</option>
@@ -101,7 +91,7 @@ export default function ReviewQueueContent() {
         </div>
 
         <div className="relative w-full lg:max-w-md">
-           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-grey" size={18} />
+           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
            <input 
               type="text" 
               placeholder="Search by title or creator..." 
@@ -122,23 +112,23 @@ export default function ReviewQueueContent() {
            >
               {/* Urgent Badge */}
               {draft.urgent && (
-                <div className="absolute right-8 top-8 flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+                <div className="absolute right-8 top-8 flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
                   <AlertCircle size={10} />
                   Urgent
                 </div>
               )}
 
               <div className="mb-6 flex items-center gap-3">
-                 <div className="h-10 w-10 shrink-0 rounded-full bg-brand-light-grey flex items-center justify-center text-xs font-black text-brand-grey dark:bg-white/10 dark:text-brand-light">
-                    {draft.creator[0]}
+                 <div className="h-10 w-10 shrink-0 rounded-full bg-brand-light-grey flex items-center justify-center text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-brand-light">
+                    {draft.creator?.[0] || "?"}
                  </div>
-                 <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-brand-dark dark:text-brand-light font-heading">{draft.creator}</p>
-                    <p className="text-[10px] font-bold text-brand-grey font-body uppercase tracking-widest">{draft.submitted}</p>
-                 </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-brand-dark dark:text-brand-light font-heading">{draft.creator || "Unknown"}</p>
+                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 font-body uppercase tracking-wider">{draft.submitted}</p>
+                  </div>
               </div>
 
-              <h4 className="mb-8 text-xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase leading-tight group-hover:text-brand-orange transition-colors">
+              <h4 className="mb-8 text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase leading-tight group-hover:text-brand-orange transition-colors">
                 {draft.title}
               </h4>
 
@@ -148,28 +138,28 @@ export default function ReviewQueueContent() {
                     <div className="flex gap-2">
                        {draft.platforms.map(p => (
                          <div key={p} className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20">
-                            {p === "Linkedin" && <Linkedin size={14} className="text-[#0077b5]" />}
-                            {p === "Twitter" && <Twitter size={14} className="text-[#1DA1F2]" />}
-                            {p === "Email" && <Mail size={14} className="text-brand-grey" />}
+                            {p === "linkedin" && <Linkedin size={14} className="text-[#0077b5]" />}
+                            {p === "twitter" && <Twitter size={14} className="text-[#1DA1F2]" />}
+                            {p === "email" && <Mail size={14} className="text-slate-400" />}
                          </div>
                        ))}
                     </div>
-                    <span className={cn(
-                      "text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg",
-                      draft.status === "Approved" ? "bg-green-100 text-green-600" :
-                      draft.status === "Rejected" ? "bg-red-100 text-red-600" :
-                      "bg-brand-orange/10 text-brand-orange"
-                    )}>
-                      {draft.status}
-                    </span>
+                     <span className={cn(
+                       "text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg",
+                       draft.status === "Approved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400" :
+                       draft.status === "Rejected" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400" :
+                       "bg-brand-orange/10 text-orange-700 dark:bg-brand-orange/20 dark:text-brand-orange"
+                     )}>
+                       {draft.status}
+                     </span>
                  </div>
 
                  {/* Dates */}
-                 <div className="flex items-center justify-between border-t border-brand-light-grey pt-6 dark:border-brand-dark/20 text-brand-grey">
-                    <div className="flex items-center gap-2">
-                       <Calendar size={14} />
-                       <span className="text-[10px] font-bold uppercase tracking-widest font-heading">{draft.estPublish}</span>
-                    </div>
+                   <div className="flex items-center justify-between border-t border-brand-light-grey pt-6 dark:border-brand-dark/20 text-slate-500 dark:text-slate-500">
+                      <div className="flex items-center gap-2">
+                         <Calendar size={14} />
+                         <span className="text-[10px] font-bold uppercase tracking-wider font-heading">{draft.estPublishDate}</span>
+                      </div>
                     <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
                  </div>
               </div>

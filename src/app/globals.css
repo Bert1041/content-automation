@@ -3,23 +3,52 @@
 @tailwind utilities;
 
 :root {
-  --background: #faf9f5;
-  --foreground: #141413;
+  --background: #fafafa;
+  --foreground: #0f172a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #141413;
-    --foreground: #faf9f5;
+    --background: #0f172a;
+    --foreground: #fafafa;
   }
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
-  font-family: 'Lora', Georgia, serif;
+  background-color: var(--background);
+  font-family: var(--font-body), sans-serif;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(255, 126, 51, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(139, 92, 246, 0.3);
+  color: var(--foreground);
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', Arial, sans-serif;
+  font-family: var(--font-heading), sans-serif;
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/80 dark:bg-brand-dark/70 backdrop-blur-xl border border-white/50 dark:border-white/10 shadow-[0_8px_32px_rgba(15,23,42,0.05)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] transition-all duration-300;
+  }
+
+  .glass-card-hover {
+    @apply hover:bg-white/80 dark:hover:bg-brand-dark/80 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:-translate-y-1;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-accent to-brand-accent-light;
+  }
+
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-brand-accent/50 focus:ring-offset-2 dark:focus:ring-offset-brand-dark transition-all;
+  }
 }

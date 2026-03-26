@@ -1,31 +1,23 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { 
   CheckCircle2, 
   XCircle, 
   Reply, 
   ChevronLeft, 
-  History, 
-  MessageSquare,
-  Linkedin,
-  Twitter,
-  Mail,
-  MoreVertical,
   ShieldCheck,
-  Eye,
   ExternalLink,
   Calendar,
-  Clock,
-  Zap
+  Zap,
+  Loader2,
+  Linkedin,
+  Twitter
 } from "lucide-react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-import Link from "next/link";
-import { useState } from "react";
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/common/AuthContext";
+import { n8nApi } from "@/lib/api/n8n";
 
 const mockDraft = {
   id: "DR-123",
@@ -55,12 +47,47 @@ The future is not human vs AI, but human + AI. The founders who win are those wh
 export default function ManagerReviewDetail() {
   const [feedback, setFeedback] = useState("");
   const [activeTab, setActiveTab] = useState<"content" | "preview" | "history">("content");
-  const [approvalMode, setApprovalMode] = useState<"none" | "approve" | "revision" | "reject">("none");
+  const [approvalMode, setApprovalMode] = useState<"none" | "approve" | "request_revision" | "reject">("none");
   const [publishType, setPublishType] = useState<"immediate" | "schedule">("immediate");
   const [publishDate, setPublishDate] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
-  const handleAction = (mode: "approve" | "revision" | "reject") => {
+  const handleAction = (mode: "approve" | "request_revision" | "reject") => {
     setApprovalMode(mode);
+  };
+
+  const submitReview = async () => {
+    if (approvalMode === "none") return;
+    
+    if ((approvalMode === "request_revision" || approvalMode === "reject") && !feedback.trim()) {
+      alert("Please provide feedback for this decision.");
+      return;
+    }
+    
+    if (approvalMode === "approve" && publishType === "schedule" && !publishDate) {
+      alert("Please select a valid scheduled date.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await n8nApi.submitManagerReview({
+        draftId: mockDraft.id,
+        action: approvalMode,
+        feedback,
+        publishDate: approvalMode === "approve" && publishType === "schedule" ? publishDate : undefined,
+        userEmail: user?.email || "unknown_manager"
+      });
+      alert(`Review submitted successfully via n8n webhook: ${approvalMode.toUpperCase()}`);
+      window.location.href = "/manager";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An unknown error occurred";
+      console.error(err);
+      alert("Failed to submit review: " + message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -68,23 +95,23 @@ export default function ManagerReviewDetail() {
       {/* 1. Breadcrumbs & Header Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/manager/review" className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-light-grey bg-white text-brand-grey transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
+          <Link href="/manager/review" className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-light-grey bg-white text-slate-600 transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
             <ChevronLeft size={20} />
           </Link>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-orange font-heading">Review Queue</span>
-              <span className="text-brand-grey opacity-50">/</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-dark dark:text-brand-light font-heading">{mockDraft.id}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-accent font-heading">Review Queue</span>
+              <span className="text-slate-300 dark:text-brand-dark/50">/</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-dark dark:text-brand-light font-heading">{mockDraft.id}</span>
             </div>
-            <h2 className="text-2xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase leading-none">
+            <h2 className="text-2xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase leading-none">
               {mockDraft.title}
             </h2>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="flex h-10 items-center justify-center gap-2 rounded-xl border border-brand-light-grey bg-white px-5 text-xs font-black uppercase tracking-widest text-brand-grey transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
+          <button className="flex h-10 items-center justify-center gap-2 rounded-xl border border-brand-light-grey bg-white px-5 text-xs font-bold uppercase tracking-wider text-slate-600 transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5">
             <ExternalLink size={16} />
             <span className="hidden sm:inline">View Profile</span>
           </button>
@@ -104,7 +131,7 @@ export default function ManagerReviewDetail() {
               {activeTab === "content" && (
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <div className="mb-10 flex items-center justify-between border-b border-brand-light-grey pb-6 dark:border-brand-dark/20">
-                     <span className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Reading Time: ~2m</span>
+                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 font-heading">Reading Time: ~2m</span>
                      <ShieldCheck size={20} className="text-green-500" />
                   </div>
                   <div className="whitespace-pre-wrap font-body text-base leading-relaxed text-brand-dark dark:text-brand-light">
@@ -164,7 +191,7 @@ export default function ManagerReviewDetail() {
                       Approve Draft
                    </button>
                    <button 
-                      onClick={() => handleAction("revision")}
+                      onClick={() => handleAction("request_revision")}
                       className="flex w-full items-center justify-center gap-3 rounded-2xl bg-brand-orange py-4 text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg shadow-brand-orange/20"
                    >
                       <Reply size={16} />
@@ -181,11 +208,11 @@ export default function ManagerReviewDetail() {
               ) : (
                 <div className="space-y-6">
                    {/* Comments Field (Mandatory for Revision/Reject) */}
-                   {(approvalMode === "revision" || approvalMode === "reject") && (
+                   {(approvalMode === "request_revision" || approvalMode === "reject") && (
                      <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Why is this {approvalMode}ed? *</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-brand-light-grey/40 font-heading">Why is this {approvalMode === "request_revision" ? "revision" : approvalMode}ed? *</label>
                         <textarea 
-                           className="min-h-[140px] w-full rounded-2xl bg-brand-light p-5 text-sm font-medium text-brand-dark placeholder:text-brand-grey focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 dark:text-brand-light border border-transparent focus:border-brand-orange transition-all"
+                           className="min-h-[140px] w-full rounded-2xl bg-brand-light p-5 text-sm font-medium text-brand-dark placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 dark:text-brand-light border border-transparent focus:border-brand-orange transition-all"
                            placeholder="Enter your feedback for the content manager..."
                            value={feedback}
                            onChange={(e) => setFeedback(e.target.value)}
@@ -206,8 +233,8 @@ export default function ManagerReviewDetail() {
                                    publishType === "immediate" ? "border-brand-dark bg-brand-light shadow-inner dark:border-brand-orange dark:bg-brand-orange/10" : "border-brand-light-grey bg-white dark:border-brand-dark/20 dark:bg-white/5"
                                  )}
                               >
-                                 <Zap size={16} className={publishType === "immediate" ? "text-brand-orange" : "text-brand-grey"} />
-                                 <span className="text-[9px] font-black uppercase tracking-widest">Immediate</span>
+                                 <Zap size={16} className={publishType === "immediate" ? "text-brand-orange" : "text-slate-400"} />
+                                 <span className="text-[9px] font-semibold uppercase tracking-wider">Immediate</span>
                               </button>
                               <button 
                                  onClick={() => setPublishType("schedule")}
@@ -216,15 +243,15 @@ export default function ManagerReviewDetail() {
                                    publishType === "schedule" ? "border-brand-dark bg-brand-light shadow-inner dark:border-brand-orange dark:bg-brand-orange/10" : "border-brand-light-grey bg-white dark:border-brand-dark/20 dark:bg-white/5"
                                  )}
                               >
-                                 <Calendar size={16} className={publishType === "schedule" ? "text-brand-orange" : "text-brand-grey"} />
-                                 <span className="text-[9px] font-black uppercase tracking-widest">Schedule</span>
+                                 <Calendar size={16} className={publishType === "schedule" ? "text-brand-orange" : "text-slate-400"} />
+                                 <span className="text-[9px] font-semibold uppercase tracking-wider">Schedule</span>
                               </button>
                            </div>
                         </div>
 
                         {publishType === "schedule" && (
                           <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
-                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">Select Date & Time</label>
+                             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-brand-light-grey/40 font-heading">Select Date & Time</label>
                              <input 
                                 type="datetime-local" 
                                 className="w-full rounded-2xl bg-brand-light p-4 text-sm font-bold text-brand-dark focus:outline-none dark:bg-white/5 dark:text-brand-light border border-brand-light-grey dark:border-brand-dark/20"
@@ -238,17 +265,20 @@ export default function ManagerReviewDetail() {
 
                    {/* Confirm Button */}
                    <div className="flex flex-col gap-3 pt-6">
-                      <button className={cn(
-                        "w-full rounded-2xl py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all active:scale-95",
+                      <button 
+                         onClick={submitReview}
+                         disabled={isSubmitting}
+                         className={cn(
+                        "flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all active:scale-95 disabled:opacity-50",
                         approvalMode === "approve" ? "bg-green-500 shadow-green-500/20" : 
-                        approvalMode === "revision" ? "bg-brand-orange shadow-brand-orange/20" :
+                        approvalMode === "request_revision" ? "bg-brand-orange shadow-brand-orange/20" :
                         "bg-red-500 shadow-red-500/20"
                       )}>
-                         Confirm {approvalMode}
+                         {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : `Confirm ${approvalMode}`}
                       </button>
                       <button 
                          onClick={() => setApprovalMode("none")}
-                         className="w-full text-[10px] font-black uppercase tracking-widest text-brand-grey hover:text-brand-dark"
+                         className="w-full text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-brand-dark"
                       >
                          Cancel Action
                       </button>
@@ -290,21 +320,21 @@ function TabButton({ children, active, onClick }: { children: React.ReactNode, a
 function MetricRow({ label, value, status }: { label: string, value: string, status: "good" | "warning" | "error" }) {
   return (
     <div className="flex items-center justify-between border-b border-brand-light-grey pb-3 last:border-0 dark:border-brand-dark/20">
-      <span className="text-[10px] font-bold text-brand-grey font-body capitalize">{label}</span>
+       <span className="text-[10px] font-bold text-slate-600 dark:text-brand-light-grey/40 font-body capitalize">{label}</span>
       <div className="flex items-center gap-2">
          <div className={cn("h-1.5 w-1.5 rounded-full", status === "good" ? "bg-green-500" : "bg-orange-500")} />
-         <span className="text-xs font-black text-brand-dark dark:text-brand-light font-heading">{value}</span>
+         <span className="text-xs font-semibold text-brand-dark dark:text-brand-light font-heading">{value}</span>
       </div>
     </div>
   );
 }
 
-function PlatformPreview({ platform, icon: Icon, content }: { platform: string, icon: any, content: string }) {
+function PlatformPreview({ platform, icon: Icon, content }: { platform: string, icon: React.ElementType, content: string }) {
   return (
     <div className="space-y-4">
        <div className="flex items-center gap-2">
           <Icon size={16} className="text-brand-dark dark:text-brand-light" />
-          <span className="text-xs font-black uppercase tracking-widest text-brand-dark dark:text-brand-light font-heading">{platform} Preview</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-brand-dark dark:text-brand-light font-heading">{platform} Preview</span>
        </div>
        <div className="rounded-2xl border border-brand-light-grey bg-brand-light/50 p-6 dark:border-brand-dark/20 dark:bg-white/5">
           <p className="whitespace-pre-wrap font-body text-sm leading-relaxed text-brand-dark dark:text-brand-light opacity-80">{content}</p>

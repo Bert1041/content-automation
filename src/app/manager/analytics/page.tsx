@@ -1,13 +1,13 @@
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
-import SystemAnalyticsContent from "@/components/SystemAnalyticsContent";
+import Sidebar from "@/components/common/Sidebar";
+import Header from "@/components/common/Header";
+import SystemAnalyticsContent from "@/components/manager/SystemAnalyticsContent";
 
 export default function SystemAnalyticsPage() {
   return (
     <div className="flex min-h-screen bg-brand-light dark:bg-brand-dark">
       <Sidebar role="manager" />
       
-      <main className="flex-1 pl-64 transition-all duration-300">
+      <main className="flex-1 pl-[20rem] transition-all duration-300">
         <Header />
         
         <div className="mx-auto max-w-7xl p-10">

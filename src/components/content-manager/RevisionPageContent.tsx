@@ -5,22 +5,12 @@ import {
   History, 
   User, 
   Calendar, 
-  CheckCircle, 
   RefreshCcw, 
   Save, 
-  Send,
-  MoreVertical,
-  ChevronRight,
-  Sparkles,
-  ArrowRight
+  ChevronRight
 } from "lucide-react";
 import { useState } from "react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "@/lib/utils";
 
 const mockRevisionData = {
   id: 1,
@@ -53,10 +43,10 @@ export default function RevisionPageContent() {
               <AlertCircle size={32} />
             </div>
             <div className="space-y-1">
-              <h2 className="text-3xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+              <h2 className="text-3xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
                 Revision Required
               </h2>
-              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500 font-heading">
+              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-red-500 font-heading">
                 Status: REJECTED & NEEDS WORK
               </p>
             </div>
@@ -64,27 +54,27 @@ export default function RevisionPageContent() {
 
           <div className="grid gap-8 lg:grid-cols-3">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-brand-grey">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-500">
                 <User size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-widest font-heading">Manager</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider font-heading">Manager</span>
               </div>
               <p className="text-sm font-bold text-brand-dark dark:text-brand-light font-heading">{mockRevisionData.manager}</p>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-brand-grey">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-500">
                 <Calendar size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-widest font-heading">Date of Rejection</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider font-heading">Date of Rejection</span>
               </div>
               <p className="text-sm font-bold text-brand-dark dark:text-brand-light font-heading">{mockRevisionData.rejectionDate}</p>
             </div>
           </div>
 
           <div className="rounded-2xl bg-white/50 p-6 border border-white/20 dark:bg-white/5 dark:border-white/10">
-            <h4 className="mb-3 text-[10px] font-black uppercase tracking-widest text-brand-grey opacity-60 font-heading">
+            <h4 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 font-heading">
               Manager Comments
             </h4>
             <p className="text-sm font-medium leading-relaxed text-brand-dark dark:text-brand-light/90 font-body">
-              "{mockRevisionData.comments}"
+              &quot;{mockRevisionData.comments}&quot;
             </p>
           </div>
         </div>
@@ -94,10 +84,10 @@ export default function RevisionPageContent() {
         {/* 2. Revision Editor Area */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+            <h3 className="text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
               Revision Editor
             </h3>
-            <span className="text-[10px] font-bold tracking-widest text-brand-orange bg-brand-orange/10 px-3 py-1 rounded-full uppercase">
+            <span className="text-[10px] font-semibold tracking-wider text-brand-orange bg-brand-orange/10 px-3 py-1 rounded-full uppercase">
               Editing Version 3
             </span>
           </div>
@@ -132,7 +122,7 @@ export default function RevisionPageContent() {
 
         {/* 3. Version History Section */}
         <div className="space-y-6">
-          <h3 className="text-xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+          <h3 className="text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
             Version History
           </h3>
           
@@ -159,9 +149,9 @@ export default function RevisionPageContent() {
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold text-brand-dark dark:text-brand-light font-heading">{item.version}</p>
-                    <span className="text-[10px] font-bold text-brand-grey font-body">{item.date}</span>
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 font-body">{item.date}</span>
                   </div>
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-brand-grey opacity-70 font-heading">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-600 dark:text-slate-400 font-heading">
                     {item.status}
                   </p>
                 </div>
@@ -175,7 +165,7 @@ export default function RevisionPageContent() {
 
           {/* Diff/Changes Highlight Mock */}
           <div className="rounded-3xl border border-brand-light-grey p-6 dark:border-brand-dark/20 bg-brand-light dark:bg-brand-dark/30">
-            <h4 className="mb-4 text-[10px] font-black uppercase tracking-widest text-brand-grey opacity-60 font-heading">
+            <h4 className="mb-4 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 font-heading">
               Key Changes Detected
             </h4>
             <div className="space-y-3">
@@ -188,8 +178,8 @@ export default function RevisionPageContent() {
                 <p className="text-xs font-medium text-brand-dark dark:text-brand-light font-body">Headings simplified as requested</p>
               </div>
               <div className="flex items-center gap-2 opacity-50">
-                <div className="h-1.5 w-1.5 rounded-full bg-brand-grey" />
-                <p className="text-xs font-medium text-brand-grey font-body italic">Still waiting for SEO validation...</p>
+                <div className="h-1.5 w-1.5 rounded-full bg-brand-grey dark:bg-slate-500" />
+                <p className="text-xs font-medium text-brand-grey dark:text-slate-400 font-body italic">Still waiting for SEO validation...</p>
               </div>
             </div>
           </div>

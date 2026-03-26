@@ -1,27 +1,18 @@
 "use client";
 
 import { 
-  BarChart3, 
-  PieChart, 
   TrendingUp, 
   CheckCircle2, 
   Clock, 
   XCircle, 
   FileText, 
-  Calendar,
   Linkedin,
   Twitter,
   Mail,
   ArrowUpRight,
-  User,
   Activity
 } from "lucide-react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "@/lib/utils";
 
 export default function AnalyticsContent() {
   return (
@@ -41,10 +32,10 @@ export default function AnalyticsContent() {
         <div className="rounded-[2.5rem] border border-brand-light-grey bg-white p-10 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
           <div className="mb-8 flex items-center justify-between">
             <div className="space-y-1">
-              <h3 className="text-xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+              <h3 className="text-xl font-bold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
                 Drafts Over Time
               </h3>
-              <p className="text-xs font-bold text-brand-grey font-body uppercase tracking-widest">Growth per week</p>
+              <p className="text-xs font-bold text-slate-600 dark:text-slate-400 font-body uppercase tracking-wider">Growth per week</p>
             </div>
             <TrendingUp size={24} className="text-brand-orange" />
           </div>
@@ -70,7 +61,7 @@ export default function AnalyticsContent() {
                 </linearGradient>
               </defs>
             </svg>
-            <div className="absolute bottom-0 flex w-full justify-between pt-4 text-[10px] font-bold text-brand-grey font-heading uppercase tracking-widest">
+            <div className="absolute bottom-0 flex w-full justify-between pt-4 text-[10px] font-bold text-slate-500 dark:text-slate-500 font-heading uppercase tracking-wider">
               <span>Mon</span>
               <span>Tue</span>
               <span>Wed</span>
@@ -86,7 +77,7 @@ export default function AnalyticsContent() {
         <div className="grid gap-8">
           {/* Status Breakdown */}
           <div className="rounded-[2.5rem] border border-brand-light-grey bg-white p-10 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
-             <h3 className="mb-6 text-xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+             <h3 className="mb-6 text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
                 Content Status
               </h3>
               <div className="space-y-4">
@@ -99,7 +90,7 @@ export default function AnalyticsContent() {
 
           {/* Platform Distribution */}
           <div className="rounded-[2.5rem] border border-brand-light-grey bg-white p-10 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
-             <h3 className="mb-6 text-xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+             <h3 className="mb-6 text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
                 Platform Distribution
               </h3>
               <div className="flex items-center justify-between">
@@ -114,7 +105,7 @@ export default function AnalyticsContent() {
       {/* Recent Publishing Activity */}
       <section className="rounded-[2.5rem] border border-brand-light-grey bg-white p-10 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
         <div className="mb-10 flex items-center justify-between">
-          <h3 className="text-2xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading uppercase">
+          <h3 className="text-2xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
             Recent Publishing Activity
           </h3>
           <button className="text-xs font-bold uppercase tracking-widest text-brand-orange hover:underline underline-offset-4">
@@ -132,7 +123,7 @@ export default function AnalyticsContent() {
   );
 }
 
-function MetricCard({ title, value, change, icon: Icon, variant = "default" }: any) {
+function MetricCard({ title, value, change, icon: Icon, variant = "default" }: { title: string; value: string; change: string; icon: React.ElementType; variant?: string }) {
   return (
     <div className="rounded-3xl border border-brand-light-grey bg-white p-6 dark:border-brand-dark/20 dark:bg-white/5 shadow-lg shadow-brand-dark/2" >
       <div className="mb-4 flex items-center justify-between">
@@ -144,20 +135,20 @@ function MetricCard({ title, value, change, icon: Icon, variant = "default" }: a
         )}>
           <Icon size={20} />
         </div>
-        <span className="text-[10px] font-black text-green-500 font-heading">{change}</span>
+        <span className="text-[10px] font-bold text-green-600 dark:text-green-500 font-heading">{change}</span>
       </div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-grey font-heading opacity-70 mb-1">{title}</p>
-      <h3 className="text-3xl font-black tracking-tighter text-brand-dark dark:text-brand-light font-heading">{value}</h3>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 font-heading mb-1">{title}</p>
+      <h3 className="text-3xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading">{value}</h3>
     </div>
   );
 }
 
-function StatusRow({ label, percentage, color }: any) {
+function StatusRow({ label, percentage, color }: { label: string; percentage: number; color: string }) {
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest font-heading">
+      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider font-heading">
         <span className="text-brand-dark dark:text-brand-light">{label}</span>
-        <span className="text-brand-grey">{percentage}%</span>
+        <span className="text-slate-600 dark:text-slate-400">{percentage}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-brand-light-grey dark:bg-brand-dark mx-auto overflow-hidden">
         <div 
@@ -169,21 +160,21 @@ function StatusRow({ label, percentage, color }: any) {
   );
 }
 
-function PlatformDot({ icon: Icon, label, value, color }: any) {
+function PlatformDot({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string; color: string }) {
   return (
     <div className="flex flex-col items-center gap-3">
       <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg", color)}>
         <Icon size={24} />
       </div>
       <div className="text-center">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-grey font-heading mb-1">{label}</p>
-        <p className="text-sm font-black text-brand-dark dark:text-brand-light font-heading">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 font-heading mb-1">{label}</p>
+        <p className="text-sm font-semibold text-brand-dark dark:text-brand-light font-heading">{value}</p>
       </div>
     </div>
   );
 }
 
-function ActivityItem({ date, platform, title }: any) {
+function ActivityItem({ date, platform, title }: { date: string; platform: string; title: string }) {
   const Icon = platform === "linkedin" ? Linkedin : platform === "twitter" ? Twitter : Mail;
   return (
     <div className="group flex items-center justify-between rounded-2xl border border-brand-light-grey p-5 transition-all hover:bg-brand-light-grey dark:border-brand-dark/20 dark:hover:bg-white/5">
@@ -193,7 +184,7 @@ function ActivityItem({ date, platform, title }: any) {
         </div>
         <div className="space-y-1">
           <p className="max-w-md text-sm font-bold text-brand-dark dark:text-brand-light font-heading line-clamp-1">{title}</p>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-grey font-heading">{date}</p>
+          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 font-heading">{date}</p>
         </div>
       </div>
       <button className="flex h-10 w-10 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white dark:hover:bg-brand-dark border border-brand-light-grey dark:border-brand-dark/40 shadow-sm">

@@ -40,3 +40,14 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
 Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+
+---
+
+## Active Project Context
+
+### Fetemi (Content Automation Platform)
+If you are working on the **Fetemi** project, the established design system is **Soft Glassmorphism / Luxury Refined**. Do **not** deviate from this into brutalism or other extremes:
+- **Typography:** `Outfit` (Headings) and `Manrope` (Body). Crucially, prioritize **medium** (`font-medium`) and **regular** (`font-normal`) weights. Avoid heavy `font-bold` usage to maintain a soft, refined look.
+- **Colors:** Deep Slate (`#0f172a`), Zinc (`#fafafa`) with Violet/Indigo soft gradients (`from-violet-500 to-indigo-600`) and accents.
+- **Components:** Use floating, heavily rounded (`rounded-[2.5rem]`) glass cards (`.glass-card`), frosted backgrounds (`bg-white/60 backdrop-blur-xl` or `bg-brand-dark/60`), and soft shadow effects (`shadow-[0_20px_40px_rgb(...)]`).
+- **Layout:** Elements like Sidebars and Headers should float with margins (e.g., `m-6`, `p-6`) rather than attaching strictly to the edges of the screen.
