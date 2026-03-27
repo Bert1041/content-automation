@@ -20,7 +20,7 @@ import {
   Check,
   AlertCircle
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, parseDraftContent } from "@/lib/utils";
 import { Draft, Platform, DraftStatus } from "@/types/content";
 import { useAuth } from "@/components/common/AuthContext";
 import { n8nApi } from "@/lib/api/n8n";
@@ -37,6 +37,7 @@ const getStatusStyle = (status: string): string => {
   if (s === "approved") return "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 ring-1 ring-emerald-500/20";
   if (s === "pending review") return "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-orange-400 ring-1 ring-amber-500/20";
   if (s === "rejected") return "bg-rose-500/10 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 ring-1 ring-rose-500/20";
+  if (s === "revision required") return "bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 ring-1 ring-blue-500/20";
   if (s === "scheduled") return "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 ring-1 ring-amber-500/20";
   if (s === "published") return "bg-slate-500/10 text-slate-800 dark:bg-slate-500/20 dark:text-brand-light ring-1 ring-slate-500/20";
   return "bg-slate-500/10 text-slate-600 dark:bg-slate-500/20 dark:text-slate-400 ring-1 ring-slate-500/20";
@@ -64,11 +65,15 @@ export default function DraftsTable() {
 
   useEffect(() => {
     async function getDrafts() {
-      if (!user?.email) return;
+      if (!user?.email) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
-        const data = await n8nApi.fetchReviewQueue(user.email);
-        setDrafts(data || []);
+        const data = await n8nApi.fetchDrafts(user.email);
+        const draftsArray = Array.isArray(data) ? data : (data as any)?.records || [];
+        setDrafts(draftsArray);
       } catch (error) {
         console.error("Failed to fetch drafts:", error);
       } finally {
@@ -202,6 +207,7 @@ export default function DraftsTable() {
               <option>All Statuses</option>
               <option>Draft</option>
               <option>Pending Review</option>
+              <option>Revision Required</option>
               <option>Rejected</option>
               <option>Approved</option>
             </select>
@@ -480,18 +486,7 @@ export default function DraftsTable() {
                   </div>
                   <div className="p-6 bg-brand-light-grey/30 dark:bg-white/5 rounded-2xl border border-brand-light-grey/50 dark:border-brand-dark/10">
                     <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                      {(() => {
-                        const content = draft.fields?.Content;
-                        try {
-                          const parsed = JSON.parse(content);
-                          if (parsed.drafts && parsed.drafts[0]) {
-                            return parsed.drafts[0].content;
-                          }
-                          return content;
-                        } catch (e) {
-                          return content;
-                        }
-                      })()}
+                      {parseDraftContent(draft.fields?.Content, draft.fields?.Platform)}
                     </p>
                   </div>
                 </div>
@@ -530,18 +525,7 @@ export default function DraftsTable() {
                   </div>
                   <div className="relative">
                     <textarea 
-                      defaultValue={(() => {
-                        const content = draft.fields?.Content;
-                        try {
-                          const parsed = JSON.parse(content);
-                          if (parsed.drafts && parsed.drafts[0]) {
-                            return parsed.drafts[0].content;
-                          }
-                          return content;
-                        } catch (e) {
-                          return content;
-                        }
-                      })()}
+                      defaultValue={parseDraftContent(draft.fields?.Content, draft.fields?.Platform)}
                       onBlur={(e) => handleUpdateDraft(draft.id, e.target.value)}
                       rows={5}
                       className="w-full rounded-2xl border border-brand-light-grey bg-white p-6 text-sm text-brand-dark transition-all focus:border-brand-accent focus:ring-4 focus:ring-brand-accent/5 dark:border-brand-dark/20 dark:bg-white/5 dark:text-brand-light shadow-inner resize-none overflow-hidden"

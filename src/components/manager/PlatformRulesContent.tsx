@@ -4,9 +4,6 @@ import {
   Linkedin, 
   Twitter, 
   Mail, 
-  Facebook, 
-  Instagram, 
-  Music2, // For TikTok
   Save, 
   Sparkles,
   MousePointer2,
@@ -15,13 +12,18 @@ import {
   RefreshCw,
   Share2,
   Heart,
-  MessageSquare
+  MessageSquare,
+  Plus,
+  Trash2,
+  X as XIconLucide,
+  RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Platform } from "@/types/content";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { n8nApi } from "@/lib/api/n8n";
 import { useAuth } from "@/components/common/AuthContext";
+import Toast, { ToastType } from "@/components/common/Toast";
 
 interface PlatformRuleItem {
   id: string;
@@ -53,27 +55,6 @@ const platformMeta: Record<string, { label: string; icon: React.ElementType; col
     color: "text-brand-orange", 
     bgColor: "bg-brand-orange/10",
     identifier: "Email" 
-  },
-  facebook: { 
-    label: "Facebook", 
-    icon: Facebook, 
-    color: "text-[#1877F2]", 
-    bgColor: "bg-[#1877F2]/10",
-    identifier: "Facebook" 
-  },
-  instagram: { 
-    label: "Instagram", 
-    icon: Instagram, 
-    color: "text-[#E4405F]", 
-    bgColor: "bg-[#E4405F]/10",
-    identifier: "Instagram" 
-  },
-  tiktok: { 
-    label: "TikTok", 
-    icon: Music2, 
-    color: "text-[#EE1D52]", 
-    bgColor: "bg-[#EE1D52]/10",
-    identifier: "TikTok" 
   }
 };
 
@@ -84,6 +65,18 @@ export default function PlatformRulesContent() {
   const [saving, setSaving] = useState(false);
   const [rules, setRules] = useState<PlatformRuleItem[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  
+  // Add Rule State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addingRule, setAddingRule] = useState(false);
+  const [newRule, setNewRule] = useState({
+    name: "",
+    description: "",
+    platform: ""
+  });
+  
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchRules = useCallback(async () => {
@@ -175,12 +168,76 @@ export default function PlatformRulesContent() {
       }
       setDirtyIds(new Set());
       fetchRules();
+      setToast({ message: "Rules updated successfully!", type: "success" });
     } catch (err: unknown) {
       console.error("Failed to update rules:", err);
-      alert("Failed to update rules.");
+      setToast({ message: "Failed to update rules.", type: "error" });
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAddRule = async (data?: { name: string; description: string; platform: string }) => {
+    // If data is provided (from the modal), use it. Otherwise fallback to state (unlikely with current modal).
+    const name = data?.name || newRule.name;
+    const description = data?.description || newRule.description;
+    const platform = data?.platform || newRule.platform;
+
+    if (!name || !description || !platform) {
+      setToast({ message: "Please fill in all fields.", type: "error" });
+      return;
+    }
+
+    try {
+      setAddingRule(true);
+      await n8nApi.rulesManager({
+        action: "create",
+        table: "Platform_Rules",
+        role: "manager",
+        userEmail: user?.email || "",
+        data: {
+          "Rule Name": name,
+          Description: description,
+          Platform: platform, 
+          Active: true
+        }
+      });
+
+      setIsAddModalOpen(false);
+      setNewRule({ name: "", description: "", platform: "" });
+      fetchRules();
+      setToast({ message: "Platform rule created successfully!", type: "success" });
+    } catch (err) {
+      console.error("Failed to add platform rule:", err);
+      setToast({ message: "Failed to add platform rule.", type: "error" });
+    } finally {
+      setAddingRule(false);
+    }
+  };
+
+  const handleDeleteRule = async (id: string) => {
+    if (role?.toLowerCase() !== "manager") return;
+    if (!confirm("Are you sure you want to delete this rule?")) return;
+
+    try {
+      await n8nApi.rulesManager({
+        action: "delete",
+        table: "Platform_Rules",
+        id: id,
+        role: "manager",
+        userEmail: user?.email || ""
+      });
+      fetchRules();
+      setToast({ message: "Rule deleted successfully!", type: "success" });
+    } catch (err) {
+      console.error("Failed to delete rule:", err);
+      setToast({ message: "Failed to delete rule.", type: "error" });
+    }
+  };
+
+  const openAddModal = () => {
+    setNewRule(prev => ({ ...prev, platform: platformMeta[activePlatform].identifier }));
+    setIsAddModalOpen(true);
   };
 
   if (loading) {
@@ -201,7 +258,14 @@ export default function PlatformRulesContent() {
     .join("\n\n");
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000 relative">
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)} 
+        />
+      )}
       {/* 1. Scalable Platform Selector */}
       <div className="relative">
         <div 
@@ -264,16 +328,35 @@ export default function PlatformRulesContent() {
               </p>
             </div>
             
-            {totalDirty > 0 && (
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={fetchRules}
+                className="group flex items-center gap-2 px-6 py-4 font-heading text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-brand-dark dark:hover:text-brand-light"
+              >
+                 <RotateCcw size={16} className="transition-transform group-hover:-rotate-180 duration-500" />
+                 Refresh
+              </button>
+              
               <button 
                 onClick={handleSave}
-                disabled={saving}
-                className="group relative flex items-center gap-2 overflow-hidden rounded-2xl bg-brand-dark px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-brand-orange disabled:opacity-50 dark:bg-brand-orange"
+                disabled={saving || dirtyIds.size === 0}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl px-8 py-4 font-heading text-xs font-bold uppercase tracking-wider text-white shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:grayscale",
+                  "bg-brand-dark shadow-brand-dark/20 dark:bg-brand-orange dark:shadow-brand-orange/30",
+                  "hover:-translate-y-0.5"
+                )}
               >
-                {saving ? <Loader2 size={14} className="animate-spin text-white" /> : <Save size={14} />}
-                <span>Save {totalDirty} Changes</span>
+                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                 {saving ? "Save" : `Save ${dirtyIds.size > 0 ? `(${dirtyIds.size})` : ""}`}
               </button>
-            )}
+
+              <button 
+                onClick={openAddModal}
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-light-grey/10 text-brand-grey transition-all hover:bg-brand-dark hover:text-white dark:hover:bg-brand-orange shadow-xl shadow-brand-dark/5"
+              >
+                <Plus size={24} />
+              </button>
+            </div>
           </div>
 
           {!filteredRules.length ? (
@@ -320,20 +403,29 @@ export default function PlatformRulesContent() {
                         </div>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => handleToggleActive(rule.id)}
-                      className={cn(
-                        "relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-500 ease-in-out",
-                        rule.Active ? "bg-brand-orange" : "bg-slate-200 dark:bg-white/10"
-                      )}
-                    >
-                      <span
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleDeleteRule(rule.id)}
+                        className="group/del rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all dark:hover:bg-rose-500/10"
+                        title="Delete rule"
+                      >
+                        <Trash2 size={16} className="transition-transform group-hover/del:scale-110" />
+                      </button>
+                      <button 
+                        onClick={() => handleToggleActive(rule.id)}
                         className={cn(
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xl transition-all duration-500 ease-in-out",
-                          rule.Active ? "translate-x-6" : "translate-x-0"
+                          "relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-500 ease-in-out",
+                          rule.Active ? "bg-brand-orange" : "bg-slate-200 dark:bg-white/10"
                         )}
-                      />
-                    </button>
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xl transition-all duration-500 ease-in-out",
+                            rule.Active ? "translate-x-6" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="relative">
@@ -488,10 +580,129 @@ export default function PlatformRulesContent() {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(200%); }
         }
-        .animate-progress {
-          animation: progress 2s infinite ease-in-out;
-        }
       `}</style>
+
+      <AddPlatformRuleModal 
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddRule}
+        adding={addingRule}
+        initialPlatform={platformMeta[activePlatform].identifier}
+        platforms={platformMeta}
+      />
+    </div>
+  );
+}
+
+// Reuse X icon from another component or import if available
+function XIcon({ size = 24, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+    </svg>
+  );
+}
+
+// Add Rule Modal
+function AddPlatformRuleModal({ 
+  isOpen, 
+  onClose, 
+  onAdd, 
+  adding,
+  initialPlatform,
+  platforms
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onAdd: (rule: { name: string; description: string; platform: string }) => void;
+  adding: boolean;
+  initialPlatform: string;
+  platforms: typeof platformMeta;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [platform, setPlatform] = useState(initialPlatform);
+
+  useEffect(() => {
+    if (isOpen) {
+      setPlatform(initialPlatform);
+    }
+  }, [isOpen, initialPlatform]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-dark/80 backdrop-blur-sm p-6">
+       <div className="w-full max-w-xl rounded-[3rem] bg-white p-12 shadow-2xl dark:bg-brand-dark dark:border dark:border-brand-dark/20 relative">
+          <button 
+             onClick={onClose}
+             className="absolute right-10 top-10 text-brand-grey hover:text-brand-dark transition-colors"
+          >
+             <XIcon size={24} />
+          </button>
+          
+          <div className="mb-10 space-y-2">
+             <h3 className="text-3xl font-black uppercase tracking-tighter font-heading text-brand-dark dark:text-brand-light">Add Platform Rule</h3>
+             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 font-body">Define a formatting constraint for a specific platform.</p>
+          </div>
+
+          <div className="space-y-6">
+             <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-200 font-heading">Rule Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Hashtag Usage" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/10 dark:text-white border border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+                />
+             </div>
+             
+             <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-200 font-heading">Platform</label>
+                <select 
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  className="w-full rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/10 dark:text-white border border-transparent appearance-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                >
+                  {Object.entries(platforms).map(([key, meta]) => (
+                    <option key={key} value={meta.identifier}>{meta.label}</option>
+                  ))}
+                </select>
+             </div>
+
+             <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-200 font-heading">Constraint Instruction</label>
+                <textarea 
+                  placeholder="e.g. Always include 3-5 relevant hashtags at the end..." 
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full h-32 rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/10 dark:text-white border border-transparent resize-none placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+                />
+             </div>
+          </div>
+
+          <div className="mt-12">
+             <button 
+               onClick={() => onAdd({ name, description, platform })}
+               disabled={adding}
+               className="w-full rounded-[2rem] bg-brand-dark py-5 text-sm flex justify-center items-center font-black uppercase tracking-widest text-white shadow-2xl transition-all active:scale-95 disabled:opacity-50 dark:bg-brand-orange"
+             >
+                {adding ? <Loader2 className="animate-spin text-white" size={18} /> : "Create Constraint"}
+             </button>
+          </div>
+       </div>
     </div>
   );
 }

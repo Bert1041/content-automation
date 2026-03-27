@@ -1,35 +1,26 @@
-"use client";
-
 import Sidebar from "@/components/common/Sidebar";
 import Header from "@/components/common/Header";
-import ReviewQueueContent from "@/components/manager/ReviewQueueContent";
-import { useLayout } from "@/components/common/LayoutContext";
-import { cn } from "@/lib/utils";
+import EmailListContent from "@/components/manager/EmailListContent";
 
-export default function ReviewQueuePage() {
-  const { sidebarCollapsed, isMobile } = useLayout();
-
+export default function EmailListManagementPage() {
   return (
     <div className="flex min-h-screen bg-brand-light dark:bg-brand-dark">
       <Sidebar role="manager" />
       
-      <main className={cn(
-        "flex-1 transition-all duration-300",
-        sidebarCollapsed ? "lg:pl-24" : "lg:pl-[20rem]"
-      )}>
+      <main className="flex-1 lg:pl-[20rem] transition-all duration-300">
         <Header />
         
         <div className="mx-auto max-w-7xl p-6 lg:p-10">
           <div className="mb-10 space-y-1">
             <h2 className="text-3xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading">
-              Review Queue
+              Email List Management
             </h2>
             <p className="text-sm font-normal text-slate-600 dark:text-brand-light-grey/60 font-body opacity-90">
-              Quality assurance and final approval for all generated content.
+              Manage the distribution list for automated notifications and newsletters.
             </p>
           </div>
           
-          <ReviewQueueContent />
+          <EmailListContent />
         </div>
       </main>
     </div>

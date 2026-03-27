@@ -50,6 +50,7 @@ const managerItems = [
   { icon: ShieldCheck, label: "SEO Rules", href: "/manager/seo" },
   { icon: Globe, label: "Platform Rules", href: "/manager/platforms" },
   { icon: Users, label: "User Management", href: "/manager/users" },
+  { icon: ClipboardList, label: "Email List", href: "/manager/emails" },
   { icon: BarChart3, label: "Analytics", href: "/manager/analytics" },
   { icon: Settings, label: "Settings", href: "/manager/settings" },
 ];

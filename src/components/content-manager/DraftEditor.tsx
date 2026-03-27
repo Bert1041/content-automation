@@ -19,7 +19,7 @@ import {
   AlertCircle,
   ChevronLeft
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, parseDraftContent } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/common/AuthContext";
 import { n8nApi } from "@/lib/api/n8n";
@@ -330,18 +330,7 @@ export default function DraftEditor({ requestId }: DraftEditorProps) {
               <textarea 
                 ref={textareaRef}
                 className="w-full min-h-[500px] p-0 border-none focus:ring-0 bg-transparent text-brand-dark dark:text-brand-light font-body text-lg leading-relaxed resize-none"
-                value={(() => {
-                  const content = currentDraft?.fields?.Content || "";
-                  try {
-                    const parsed = JSON.parse(content);
-                    if (parsed.drafts && parsed.drafts[0]) {
-                      return parsed.drafts[0].content;
-                    }
-                    return content;
-                  } catch (e) {
-                    return content;
-                  }
-                })()}
+                value={parseDraftContent(currentDraft?.fields?.Content || "", currentDraft?.fields?.Platform)}
                 onChange={(e) => handleUpdateContent(e.target.value)}
                 placeholder="Start writing..."
               />
@@ -403,16 +392,7 @@ export default function DraftEditor({ requestId }: DraftEditorProps) {
                 {(() => {
                   const compId = comparisonDraftId || drafts.find(d => d.id !== selectedDraftId)?.id;
                   const comparisonDraft = drafts.find(d => d.id === compId);
-                  const content = comparisonDraft?.fields?.Content || "Select another variation to compare.";
-                  try {
-                    const parsed = JSON.parse(content);
-                    if (parsed.drafts && parsed.drafts[0]) {
-                      return parsed.drafts[0].content;
-                    }
-                    return content;
-                  } catch (e) {
-                    return content;
-                  }
+                  return parseDraftContent(comparisonDraft?.fields?.Content || "", comparisonDraft?.fields?.Platform);
                 })()}
               </div>
             </div>

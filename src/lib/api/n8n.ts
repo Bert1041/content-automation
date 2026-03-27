@@ -13,21 +13,39 @@ export interface Draft {
 }
 
 /**
- * Helper to make requests to n8n webhooks
+ * Internal helper to perform the fetch with logging
  */
-const fetchN8n = async (endpoint: string, options: RequestInit = {}) => {
-  if (!N8N_WEBHOOK_BASE) throw new Error("API Base URL missing (NEXT_PUBLIC_N8N_WEBHOOK_URL)");
-  const url = `${N8N_WEBHOOK_BASE}${endpoint}`;
-  
-  // In a real app we would pass an auth token here
+const fetchN8nInternal = async (url: string, options: RequestInit = {}) => {
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
 
-  const response = await fetch(url, { ...options, headers });
+  console.log(`[n8n] Requesting: ${url}`, { 
+    method: options.method || 'GET', 
+    body: options.body ? 'JSON Payload' : 'No Body' 
+  });
+
+  try {
+    const response = await fetch(url, { ...options, headers });
+    return response;
+  } catch (error) {
+    console.error(`[n8n] Fetch Failed for ${url}:`, error);
+    throw error;
+  }
+};
+
+const fetchN8n = async (endpoint: string, options: RequestInit = {}) => {
+  if (!N8N_WEBHOOK_BASE) {
+    console.error("[n8n] API Base URL missing!");
+    throw new Error("API Base URL missing (NEXT_PUBLIC_N8N_WEBHOOK_URL)");
+  }
+  
+  const url = `${N8N_WEBHOOK_BASE}${endpoint}`;
+  const response = await fetchN8nInternal(url, options);
 
   if (!response.ok) {
+    console.error(`[n8n] Error Response (${response.status}):`, response.statusText);
     throw new Error(`n8n webhook error: ${response.statusText}`);
   }
 
@@ -36,7 +54,15 @@ const fetchN8n = async (endpoint: string, options: RequestInit = {}) => {
      return true;
   }
 
-  return response.json();
+  const text = await response.text();
+  if (!text) return true;
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse n8n response as JSON:", text);
+    return text;
+  }
 };
 
 export const n8nApi = {
@@ -79,22 +105,55 @@ export const n8nApi = {
    */
   rulesManager: async (payload: {
     action: "create" | "read" | "update" | "delete";
-    table: "SEO_Rules" | "Platform_Rules";
+    table: "SEO_Rules" | "Platform_Rules" | "Email_List";
     role: string;
     id?: string;
     data?: Record<string, unknown>;
     userEmail?: string;
+    airtableBaseId?: string;
   }) => {
-    return fetchN8n("/rules-manager", {
+    const tableIdMap: Record<string, string> = {
+      "SEO_Rules": "tblycjU7SwDvSyw8t",
+      "Platform_Rules": "tblKK2qvVArl5pHGm",
+      "Email_List": "Email_List" // Placeholder or keep as name if ID not provided
+    };
+
+    const endpoint = payload.table === "Email_List" ? "/email-list-manager" : "/rules-manager";
+ 
+    return fetchN8n(endpoint, {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        tableId: tableIdMap[payload.table] || payload.table
+      }),
+    });
+  },
+
+  /**
+   * Dedicated endpoint for adding multiple emails to the distribution list in one batch.
+   */
+  addBatchEmails: async (payload: {
+    emails: string[];
+    userEmail: string;
+    role: string;
+  }) => {
+    return fetchN8n("/add-emails-batch", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
   /**
-   * Fetches the current list of drafts from Airtable via n8n.
-   * (Mock data is currently preserved in the UI per user request, 
-   * but this endpoint is ready for integration)
+   * Fetches for the user's personal content manager dashboard.
+   */
+  fetchDrafts: async (userEmail: string): Promise<Draft[]> => {
+    return fetchN8n(`/drafts?email=${encodeURIComponent(userEmail)}`, {
+      method: "GET",
+    });
+  },
+
+  /**
+   * Fetches the shared manager review queue.
    */
   fetchReviewQueue: async (userEmail: string): Promise<Draft[]> => {
     return fetchN8n(`/review-queue?email=${encodeURIComponent(userEmail)}`, {
@@ -144,6 +203,29 @@ export const n8nApi = {
     userEmail: string;
   }) => {
     return fetchN8n("/delete-draft", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Submits a consolidated batch of manager decisions.
+   */
+  submitBatchReview: async (payload: {
+    requestId?: string;
+    userEmail: string;
+    publishStrategy: "immediate" | "schedule";
+    publishDate?: string;
+    decisions: Array<{
+      draftId: string;
+      action: string;
+      feedback: string;
+      platform: string;
+      imageDirective?: string;
+      imagePlacement?: string;
+    }>;
+  }) => {
+    return fetchN8n("/submit-batch-review", {
       method: "POST",
       body: JSON.stringify(payload),
     });
