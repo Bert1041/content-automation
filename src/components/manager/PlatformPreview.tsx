@@ -2,6 +2,7 @@
 
 import { cn, parseDraftContent } from "@/lib/utils";
 import { Linkedin, Twitter, Mail, Heart, MessageCircle, Share2, Repeat2, BarChart3, MoreHorizontal, User, Send } from "lucide-react";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 
 interface PlatformPreviewProps {
   content: string;
@@ -29,9 +30,7 @@ export function PlatformPreview({ content, platform }: PlatformPreviewProps) {
           </div>
         </div>
         <div className="px-4 pb-4">
-           <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800 dark:text-slate-200">
-             {text}
-           </p>
+           <MarkdownRenderer content={text} />
         </div>
         <div className="border-t border-slate-100 p-2 dark:border-slate-800">
           <div className="flex items-center justify-around">
@@ -68,13 +67,9 @@ export function PlatformPreview({ content, platform }: PlatformPreviewProps) {
               </div>
               <MoreHorizontal size={14} className="text-slate-500 dark:text-slate-400" />
             </div>
-            <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-slate-800 dark:text-slate-200">
-              {text.split(' ').map((word, i) => (
-                word.startsWith('#') || word.startsWith('@') ? 
-                <span key={i} className="text-brand-orange hover:underline cursor-pointer">{word} </span> : 
-                word + ' '
-              ))}
-            </p>
+            <div className="text-[14px] leading-relaxed text-slate-800 dark:text-slate-200">
+               <MarkdownRenderer content={text} />
+            </div>
             <div className="mt-4 flex max-w-sm items-center justify-between text-slate-700 dark:text-slate-300">
                <MessageCircle size={16} className="hover:text-blue-500 transition-colors" />
                <Repeat2 size={16} className="hover:text-emerald-500 transition-colors" />
@@ -92,19 +87,19 @@ export function PlatformPreview({ content, platform }: PlatformPreviewProps) {
     return (
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
         <div className="bg-slate-100 p-4 border-b border-slate-200 dark:bg-white/10 dark:border-slate-800">
-           <div className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Newsletter Subject Line</div>
-           <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">Weekly Insights: Creating Magic with CSS & SVG</div>
+           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Newsletter Subject Line</div>
+           <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Weekly Insights: Creating Magic with CSS & SVG</div>
         </div>
         <div className="p-8">
            <div className="mx-auto max-w-md space-y-6">
               <div className="h-12 w-full bg-slate-100 dark:bg-white/10 rounded-lg flex items-center justify-center">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Newsletter Header</span>
+                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Newsletter Header</span>
               </div>
-              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 font-serif">
-                {text}
-              </p>
+              <div className="text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 font-serif">
+                <MarkdownRenderer content={text} />
+              </div>
               <div className="h-10 w-40 bg-brand-orange rounded-full flex items-center justify-center shadow-lg shadow-brand-orange/20">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-white">Read Full Case Study</span>
+                 <span className="text-[10px] font-bold uppercase tracking-widest text-white">Read Full Case Study</span>
               </div>
            </div>
         </div>
@@ -114,9 +109,9 @@ export function PlatformPreview({ content, platform }: PlatformPreviewProps) {
 
   return (
     <div className="prose prose-sm max-w-none dark:prose-invert">
-      <p className="text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-body">
-        {text}
-      </p>
+      <div className="text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-body">
+        <MarkdownRenderer content={text} />
+      </div>
     </div>
   );
 }

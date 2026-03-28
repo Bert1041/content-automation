@@ -10,25 +10,88 @@ import {
   Twitter,
   Mail,
   ArrowUpRight,
-  Activity
+  Activity,
+  Loader2
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/components/common/AuthContext";
+import { getAnalyticsSummary, AnalyticsSummary } from "@/lib/firebase/analytics";
 import { cn } from "@/lib/utils";
 
-export default function AnalyticsContent() {
+export default function AnalyticsContent({ role = "content-manager" }: { role?: string }) {
+  const { user } = useAuth();
+  const [metrics, setMetrics] = useState<AnalyticsSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [permissionError, setPermissionError] = useState(false);
+
+  useEffect(() => {
+    async function loadMetrics() {
+      if (!user?.email) return;
+      setIsLoading(true);
+      setPermissionError(false);
+      try {
+        const data = await getAnalyticsSummary(user.email, role);
+        setMetrics(data);
+      } catch (err: any) {
+        if (err.message === "PROMPTED_PERMISSION_DENIED") {
+          setPermissionError(true);
+        }
+        console.error("Failed to load metrics:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadMetrics();
+  }, [user?.email, role]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-brand-orange" />
+      </div>
+    );
+  }
+
+  if (permissionError) {
+    return (
+      <div className="rounded-[2.5rem] border border-amber-200 bg-amber-50 p-10 dark:border-amber-500/20 dark:bg-amber-500/5 text-center space-y-4">
+        <XCircle size={40} className="mx-auto text-amber-500" />
+        <h3 className="text-xl font-bold text-amber-900 dark:text-amber-400 font-heading uppercase">Analytics Access Restricted</h3>
+        <p className="text-sm text-amber-800/70 dark:text-amber-400/60 max-w-md mx-auto">
+          To view system-wide analytics, your role requires specific Firestore read permissions. Please ensure your Security Rules are updated in the Firebase Console.
+        </p>
+      </div>
+    );
+  }
+
+  // Use real metrics or fallbacks if not yet available
+  const stats = metrics || {
+    totalDrafts: 0,
+    pendingReview: 0,
+    approved: 0,
+    rejected: 0,
+    published: 0,
+    platformDistribution: { linkedin: 0, twitter: 0, email: 0 }
+  };
+
+  // Calculate platform percentages
+  const platformTotal = stats.platformDistribution.linkedin + stats.platformDistribution.twitter + stats.platformDistribution.email || 1;
+  const getPct = (val: number) => Math.round((val / platformTotal) * 100);
+
   return (
     <div className="space-y-12 pb-20">
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricCard title="Drafts Created" value="124" change="+12%" icon={FileText} />
-        <MetricCard title="Pending Review" value="8" change="-2%" icon={Clock} variant="orange" />
-        <MetricCard title="Rejected Drafts" value="2" change="-5%" icon={XCircle} />
-        <MetricCard title="Approved Drafts" value="38" change="+18%" icon={CheckCircle2} />
-        <MetricCard title="Published Content" value="148" change="+24%" icon={Activity} variant="dark" />
+        <MetricCard title="Total Drafts" value={stats.totalDrafts.toString()} change="+0%" icon={FileText} />
+        <MetricCard title="Pending Review" value={stats.pendingReview.toString()} change="+0%" icon={Clock} variant="orange" />
+        <MetricCard title="Rejected Drafts" value={stats.rejected.toString()} change="+0%" icon={XCircle} />
+        <MetricCard title="Approved Drafts" value={stats.approved.toString()} change="+0%" icon={CheckCircle2} />
+        <MetricCard title="Published Content" value={stats.published.toString()} change="+0%" icon={Activity} variant="dark" />
       </div>
 
       {/* Charts Section */}
       <div className="grid gap-10 lg:grid-cols-2">
-        {/* Drafts Over Time (Mocked SVG Chart) */}
+        {/* Drafts Over Time (Still mocked for now as we don't have historical aggregation yet) */}
         <div className="rounded-[2.5rem] border border-brand-light-grey bg-white p-10 shadow-xl shadow-brand-dark/5 dark:border-brand-dark/20 dark:bg-white/5">
           <div className="mb-8 flex items-center justify-between">
             <div className="space-y-1">
@@ -40,7 +103,6 @@ export default function AnalyticsContent() {
             <TrendingUp size={24} className="text-brand-orange" />
           </div>
           <div className="relative h-64 w-full">
-            {/* Simple SVG Chart Placeholder */}
             <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
               <path 
                 d="M 0 80 Q 20 70 40 75 T 60 50 T 80 40 T 100 20" 
@@ -61,15 +123,6 @@ export default function AnalyticsContent() {
                 </linearGradient>
               </defs>
             </svg>
-            <div className="absolute bottom-0 flex w-full justify-between pt-4 text-[10px] font-bold text-slate-500 dark:text-slate-500 font-heading uppercase tracking-wider">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
-            </div>
           </div>
         </div>
 
@@ -81,10 +134,10 @@ export default function AnalyticsContent() {
                 Content Status
               </h3>
               <div className="space-y-4">
-                <StatusRow label="Published" percentage={65} color="bg-green-500" />
-                <StatusRow label="Approved" percentage={15} color="bg-brand-orange" />
-                <StatusRow label="Pending" percentage={10} color="bg-brand-grey" />
-                <StatusRow label="Rejected" percentage={10} color="bg-red-500" />
+                <StatusRow label="Published" percentage={Math.round((stats.published / (stats.totalDrafts || 1)) * 100)} color="bg-green-500" />
+                <StatusRow label="Approved" percentage={Math.round((stats.approved / (stats.totalDrafts || 1)) * 100)} color="bg-brand-orange" />
+                <StatusRow label="Pending" percentage={Math.round((stats.pendingReview / (stats.totalDrafts || 1)) * 100)} color="bg-brand-grey" />
+                <StatusRow label="Rejected" percentage={Math.round((stats.rejected / (stats.totalDrafts || 1)) * 100)} color="bg-red-500" />
               </div>
           </div>
 
@@ -93,10 +146,10 @@ export default function AnalyticsContent() {
              <h3 className="mb-6 text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase">
                 Platform Distribution
               </h3>
-              <div className="flex items-center justify-between">
-                <PlatformDot icon={Linkedin} label="LinkedIn" value="45%" color="bg-brand-dark dark:bg-brand-orange" />
-                <PlatformDot icon={Twitter} label="X (Twitter)" value="30%" color="bg-brand-grey" />
-                <PlatformDot icon={Mail} label="Email" value="25%" color="bg-brand-light-grey" />
+              <div className="flex items-center justify-between px-4">
+                <PlatformDot icon={Linkedin} label="LinkedIn" value={`${getPct(stats.platformDistribution.linkedin)}%`} color="bg-brand-dark dark:bg-brand-orange" />
+                <PlatformDot icon={Twitter} label="X (Twitter)" value={`${getPct(stats.platformDistribution.twitter)}%`} color="bg-brand-grey" />
+                <PlatformDot icon={Mail} label="Email" value={`${getPct(stats.platformDistribution.email)}%`} color="bg-brand-light-grey" />
               </div>
           </div>
         </div>

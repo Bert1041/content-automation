@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -18,13 +18,15 @@ import {
   Loader2,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { cn, parseDraftContent } from "@/lib/utils";
 import { Draft, Platform, DraftStatus } from "@/types/content";
 import { useAuth } from "@/components/common/AuthContext";
 import { n8nApi } from "@/lib/api/n8n";
-
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
+import { fetchDraftsFromFirestore, updateDraftInFirestore } from "@/lib/firebase/drafts";
 
 const platformIcons: Partial<Record<Platform, React.ReactNode>> = {
   linkedin: <Linkedin size={14} />,
@@ -63,54 +65,59 @@ export default function DraftsTable() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    async function getDrafts() {
-      if (!user?.email) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const data = await n8nApi.fetchDrafts(user.email);
-        const draftsArray = Array.isArray(data) ? data : (data as any)?.records || [];
-        setDrafts(draftsArray);
-      } catch (error) {
-        console.error("Failed to fetch drafts:", error);
-      } finally {
-        setIsLoading(false);
-      }
+  const loadDrafts = useCallback(async () => {
+    if (!user?.email) {
+      setIsLoading(false);
+      return;
     }
-    getDrafts();
+    setIsLoading(true);
+    try {
+      // Transitioned FROM Airtable (n8n) TO Firebase Firestore
+      const draftsArray = await fetchDraftsFromFirestore(user.email);
+      console.log(`[DraftsTable] Firestore Data received:`, draftsArray);
+      
+      // Filter out empty objects (graceful fallback)
+      setDrafts(draftsArray.filter((d: any) => d && Object.keys(d).length > 0));
+    } catch (error) {
+      console.error("Failed to fetch drafts from Firestore:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [user?.email]);
+
+  useEffect(() => {
+    loadDrafts();
+  }, [loadDrafts]);
 
   const groupedDrafts = useMemo(() => {
     const groups: Record<string, any[]> = {};
     drafts.forEach(draft => {
-      const requestId = draft.fields?.RequestId || draft.id || "unknown";
+      // Use the normalized requestId from the firestore service
+      const requestId = draft.requestId || "unknown";
       if (!groups[requestId]) groups[requestId] = [];
       groups[requestId].push(draft);
     });
     // Sort groups by the most recent generation in each group
     return Object.values(groups).sort((a, b) => {
-      const dateA = new Date(a[0].fields?.GeneratedAt || 0).getTime();
-      const dateB = new Date(b[0].fields?.GeneratedAt || 0).getTime();
+      const dateA = new Date(a[0]?.generatedAt || 0).getTime();
+      const dateB = new Date(b[0]?.generatedAt || 0).getTime();
       return dateB - dateA;
     });
   }, [drafts]);
 
   const filteredGroups = groupedDrafts.filter(group => {
     const mainDraft = group[0];
-    const fields = mainDraft.fields || {};
-    const matchesSearch = (fields.Topic || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (mainDraft.topic || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     // For status/platform filters, we check if ANY draft in the group matches
-    const matchesStatus = statusFilter === "All Statuses" || group.some(d => (d.fields?.Status || "").toLowerCase() === statusFilter.toLowerCase());
+    const matchesStatus = statusFilter === "All Statuses" || group.some(d => (d.status || "").toLowerCase() === statusFilter.toLowerCase());
     
     const matchesPlatform = platformFilter === "All Platforms" || group.some(d => {
       let pKey = "";
-      if (d.fields?.Platform === "X (Twitter)") pKey = "Twitter";
-      else if (d.fields?.Platform === "LinkedIn") pKey = "LinkedIn";
-      else if (d.fields?.Platform === "Email Newsletter") pKey = "Email";
+      const platform = d.platform || "";
+      if (platform === "X (Twitter)") pKey = "Twitter";
+      else if (platform === "LinkedIn") pKey = "LinkedIn";
+      else if (platform === "Email Newsletter") pKey = "Email";
       return pKey === platformFilter;
     });
     
@@ -128,47 +135,7 @@ export default function DraftsTable() {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, platformFilter]);
 
-  const handleUpdateDraft = async (draftId: string, content: string) => {
-    if (!user?.email) return;
-    setIsUpdating(true);
-    try {
-      await n8nApi.updateDraft({
-        id: draftId,
-        fields: { Content: content },
-        userEmail: user.email
-      });
-      // Refresh local state or re-fetch
-      const data = await n8nApi.fetchReviewQueue(user.email);
-      setDrafts(data || []);
-      // If we are in edit modal, we might need to update the selectedGroup too
-      if (selectedGroup) {
-         setSelectedGroup(prev => prev ? prev.map(d => d.id === draftId ? { ...d, fields: { ...d.fields, Content: content } } : d) : null);
-      }
-    } catch (error) {
-      console.error("Failed to update draft:", error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
-  const handleDeleteGroup = async (requestId: string) => {
-    if (!user?.email) return;
-    setIsUpdating(true);
-    try {
-      await n8nApi.deleteDraft({
-        requestId: requestId,
-        userEmail: user.email
-      });
-      const data = await n8nApi.fetchReviewQueue(user.email);
-      setDrafts(data || []);
-      setIsDeleteModalOpen(false);
-      setSelectedGroup(null);
-    } catch (error) {
-      console.error("Failed to delete group:", error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -196,6 +163,16 @@ export default function DraftsTable() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Refresh Button */}
+          <button 
+            onClick={loadDrafts}
+            disabled={isLoading}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-light-grey bg-white text-slate-500 transition-all hover:bg-brand-light dark:border-brand-dark/20 dark:bg-white/5 shadow-sm"
+            title="Refresh Drafts"
+          >
+            <RefreshCw size={16} className={cn(isLoading && "animate-spin")} />
+          </button>
+          
           {/* Status Filter */}
           <div className="relative">
             <select 
@@ -247,12 +224,11 @@ export default function DraftsTable() {
           <tbody className="divide-y divide-brand-light-grey dark:divide-brand-dark/20">
             {paginatedGroups.map((group) => {
               const mainDraft = group[0];
-              const { fields } = mainDraft;
-              const date = fields.GeneratedAt ? new Date(fields.GeneratedAt).toLocaleDateString() : "N/A";
+              const date = mainDraft.generatedAt ? new Date(mainDraft.generatedAt).toLocaleDateString("en-US") : "N/A";
               
               // Get unique platforms in this group
               const platforms = Array.from(new Set(group.map(d => {
-                const p = d.fields?.Platform;
+                const p = d.platform;
                 if (p === "X (Twitter)") return "twitter";
                 if (p === "LinkedIn") return "linkedin";
                 if (p === "Email Newsletter") return "email";
@@ -260,16 +236,16 @@ export default function DraftsTable() {
               }))) as Platform[];
 
               // Overall status: if any are pending, show pending, else most frequent
-              const status = group.some(d => d.fields?.Status?.toLowerCase() === "pending review") 
+              const status = group.some(d => (d.status || "").toLowerCase() === "pending review") 
                 ? "Pending Review" 
-                : fields.Status || "Draft";
+                : mainDraft.status || "Draft";
 
               return (
-                <tr key={mainDraft.fields?.RequestId || mainDraft.id} className="group hover:bg-brand-light-grey/30 dark:hover:bg-white/5 transition-colors">
+                <tr key={mainDraft.requestId || mainDraft.id} className="group hover:bg-brand-light-grey/30 dark:hover:bg-white/5 transition-colors">
                   <td className="px-8 py-5 max-w-sm">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-brand-dark dark:text-brand-light truncate">{fields.Topic}</span>
-                      <span className="text-[10px] text-slate-400 font-mono mt-1 opacity-60">ID: {fields.RequestId}</span>
+                      <span className="text-sm font-medium text-brand-dark dark:text-brand-light truncate">{mainDraft.topic}</span>
+                      <span className="text-[10px] text-slate-400 font-mono mt-1 opacity-60">ID: {mainDraft.requestId}</span>
                     </div>
                   </td>
                   <td className="px-8 py-5">
@@ -300,10 +276,10 @@ export default function DraftsTable() {
                         <Eye size={16} />
                       </button>
                       <button 
-                         onClick={() => { 
-                           const requestId = group[0].fields?.RequestId;
-                           if (requestId) router.push(`/edit?requestId=${requestId}`);
-                         }}
+                        onClick={() => { 
+                          const requestId = group[0].requestId;
+                          if (requestId) router.push(`/edit?requestId=${requestId}`);
+                        }}
                         className="rounded-lg p-2 transition-colors hover:bg-brand-orange/10 hover:text-brand-orange text-slate-400 dark:text-slate-500 focus-ring" title="Edit Drafts">
                         <Edit2 size={16} />
                       </button>
@@ -313,14 +289,20 @@ export default function DraftsTable() {
                             if (!user?.email) return;
                             setIsUpdating(true);
                             try {
-                              // We submit the first draft in the group for review by default
-                              await n8nApi.updateDraft({
-                                id: mainDraft.id,
-                                fields: { Status: "Pending Review" },
-                                userEmail: user.email
-                              });
-                              const data = await n8nApi.fetchReviewQueue(user.email);
-                              setDrafts(data || []);
+                              // Parallel update: Airtable (via n8n) and Firestore (direct)
+                              await Promise.all([
+                                n8nApi.updateDraft({
+                                  id: mainDraft.id,
+                                  fields: { Status: "Pending Review" },
+                                  userEmail: user.email
+                                }),
+                                updateDraftInFirestore(mainDraft.id, {
+                                  status: "Pending Review"
+                                })
+                              ]);
+                              
+                              // Refresh local state
+                              await loadDrafts();
                             } catch (error) {
                               console.error("Failed to submit for review:", error);
                             } finally {
@@ -331,11 +313,6 @@ export default function DraftsTable() {
                           <Send size={16} />
                         </button>
                       )}
-                      <button 
-                        onClick={() => { setSelectedGroup(group); setIsDeleteModalOpen(true); }}
-                        className="rounded-lg p-2 transition-colors hover:bg-red-500/10 hover:text-red-500 text-slate-400 dark:text-slate-500 focus-ring" title="Delete Group">
-                        <Trash2 size={16} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -348,23 +325,22 @@ export default function DraftsTable() {
       <div className="grid gap-4 lg:hidden">
         {paginatedGroups.map((group) => {
           const mainDraft = group[0];
-          const { fields } = mainDraft;
-          const date = fields.GeneratedAt ? new Date(fields.GeneratedAt).toLocaleDateString() : "N/A";
+          const date = mainDraft.generatedAt ? new Date(mainDraft.generatedAt).toLocaleDateString("en-US") : "N/A";
           
           const platforms = Array.from(new Set(group.map(d => {
-            const p = d.fields?.Platform;
+            const p = d.platform;
             if (p === "X (Twitter)") return "twitter";
             if (p === "LinkedIn") return "linkedin";
             if (p === "Email Newsletter") return "email";
             return "twitter";
           }))) as Platform[];
 
-          const status = group.some(d => d.fields?.Status?.toLowerCase() === "pending review") 
+          const status = group.some(d => (d.status || "").toLowerCase() === "pending review") 
             ? "Pending Review" 
-            : fields.Status || "Draft";
+            : mainDraft.status || "Draft";
 
           return (
-            <div key={mainDraft.fields?.RequestId || mainDraft.id} className="glass-card p-6 glass-card-hover">
+            <div key={mainDraft.requestId || mainDraft.id} className="glass-card p-6 glass-card-hover">
               <div className="mb-4 flex items-start justify-between">
                 <span className={cn(
                   "rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.1em]",
@@ -377,9 +353,9 @@ export default function DraftsTable() {
                 </button>
               </div>
               <h3 className="mb-2 text-lg font-bold text-brand-dark dark:text-brand-light font-heading leading-tight truncate">
-                {fields.Topic}
+                {mainDraft.topic}
               </h3>
-              <p className="mb-4 text-[10px] text-slate-400 font-mono opacity-60">ID: {fields.RequestId}</p>
+              <p className="mb-4 text-[10px] text-slate-400 font-mono opacity-60">ID: {mainDraft.requestId}</p>
               
               <div className="flex items-center justify-between border-t border-brand-light-grey pt-4 dark:border-brand-dark/20">
                 <div className="flex gap-2">
@@ -391,18 +367,13 @@ export default function DraftsTable() {
                   </button>
                   <button 
                     onClick={() => { 
-                      const requestId = group[0].fields?.RequestId;
+                      const requestId = group[0].requestId;
                       if (requestId) router.push(`/edit?requestId=${requestId}`);
                     }}
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-orange/10 text-brand-orange shadow-sm"
+                    title="Edit Drafts"
                   >
                     <Edit2 size={18} />
-                  </button>
-                  <button 
-                    onClick={() => { setSelectedGroup(group); setIsDeleteModalOpen(true); }}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 shadow-sm"
-                  >
-                    <Trash2 size={18} />
                   </button>
                 </div>
                 <div className="text-right">
@@ -458,7 +429,7 @@ export default function DraftsTable() {
           <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white dark:bg-brand-dark rounded-[2.5rem] shadow-2xl flex flex-col border border-brand-light-grey dark:border-brand-dark/20">
             <div className="p-8 border-b border-brand-light-grey dark:border-brand-dark/20 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-brand-dark dark:text-brand-light font-heading">{selectedGroup[0].fields?.Topic}</h2>
+                <h2 className="text-2xl font-bold text-brand-dark dark:text-brand-light font-heading">{selectedGroup[0].topic}</h2>
                 <p className="text-sm text-brand-grey mt-1">Generation Overview • {selectedGroup.length} Variations</p>
               </div>
               <button 
@@ -470,118 +441,33 @@ export default function DraftsTable() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-8 space-y-8 scroll-premium">
-              {selectedGroup.map((draft, idx) => (
+              {selectedGroup.map((draft, idx) => {
+                return (
                 <div key={draft.id} className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-accent/10 text-brand-accent">
-                      {platformIcons[draft.fields?.Platform === "X (Twitter)" ? "twitter" : draft.fields?.Platform === "LinkedIn" ? "linkedin" : "email"]}
+                      {platformIcons[draft.platform === "X (Twitter)" ? "twitter" : draft.platform === "LinkedIn" ? "linkedin" : "email"]}
                     </div>
-                    <span className="font-bold text-brand-dark dark:text-brand-light uppercase tracking-widest text-xs">{draft.fields?.Platform}</span>
+                    <span className="font-bold text-brand-dark dark:text-brand-light uppercase tracking-widest text-xs">{draft.platform}</span>
                     <span className={cn(
                       "ml-auto rounded-full border px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]",
-                      getStatusStyle(draft.fields?.Status || "Draft")
+                      getStatusStyle(draft.status || "Draft")
                     )}>
-                      {draft.fields?.Status}
+                      {draft.status}
                     </span>
                   </div>
-                  <div className="p-6 bg-brand-light-grey/30 dark:bg-white/5 rounded-2xl border border-brand-light-grey/50 dark:border-brand-dark/10">
-                    <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                      {parseDraftContent(draft.fields?.Content, draft.fields?.Platform)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {isEditModalOpen && selectedGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white dark:bg-brand-dark rounded-[2.5rem] shadow-2xl flex flex-col border border-brand-light-grey dark:border-brand-dark/20">
-            <div className="p-8 border-b border-brand-light-grey dark:border-brand-dark/20 flex items-center justify-between bg-brand-light-grey/10 dark:bg-white/[0.02]">
-              <div>
-                <h2 className="text-2xl font-bold text-brand-dark dark:text-brand-light font-heading italic">Edit Generation Group</h2>
-                <p className="text-sm text-brand-grey mt-1">Manual Content Refinement</p>
-              </div>
-              <button 
-                onClick={() => setIsEditModalOpen(false)}
-                className="p-2 hover:bg-brand-light-grey dark:hover:bg-white/10 rounded-full transition-colors"
-                disabled={isUpdating}
-              >
-                <X size={24} className="text-brand-grey" />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-8 space-y-10 scroll-premium">
-              {selectedGroup.map((draft, idx) => (
-                <div key={draft.id} className="space-y-4 group/item">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-orange/10 text-brand-orange">
-                      {platformIcons[draft.fields?.Platform === "X (Twitter)" ? "twitter" : draft.fields?.Platform === "LinkedIn" ? "linkedin" : "email"]}
-                    </div>
-                    <span className="font-bold text-brand-dark dark:text-brand-light uppercase tracking-widest text-xs italic">{draft.fields?.Platform}</span>
-                  </div>
-                  <div className="relative">
-                    <textarea 
-                      defaultValue={parseDraftContent(draft.fields?.Content, draft.fields?.Platform)}
-                      onBlur={(e) => handleUpdateDraft(draft.id, e.target.value)}
-                      rows={5}
-                      className="w-full rounded-2xl border border-brand-light-grey bg-white p-6 text-sm text-brand-dark transition-all focus:border-brand-accent focus:ring-4 focus:ring-brand-accent/5 dark:border-brand-dark/20 dark:bg-white/5 dark:text-brand-light shadow-inner resize-none overflow-hidden"
-                      placeholder="Enter content..."
+                    <MarkdownRenderer 
+                      content={parseDraftContent(draft.content, draft.platform)} 
+                      platform={draft.platform}
                     />
-                    {isUpdating && (
-                      <div className="absolute top-4 right-4 animate-spin text-brand-accent">
-                        <Loader2 size={16} />
-                      </div>
-                    )}
-                  </div>
                 </div>
-              ))}
-            </div>
-            
-            <div className="p-8 border-t border-brand-light-grey dark:border-brand-dark/20 bg-brand-light-grey/10 dark:bg-white/[0.02] flex justify-end gap-4">
-              <button 
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-6 py-2 text-sm font-bold text-brand-grey hover:text-brand-dark dark:text-slate-400 dark:hover:text-brand-light transition-colors"
-              >
-                Done
-              </button>
+              );})}
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && selectedGroup && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-dark/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-white dark:bg-brand-dark rounded-[2rem] p-8 shadow-2xl border border-brand-light-grey dark:border-brand-dark/20 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 mb-6">
-              <AlertCircle size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-brand-dark dark:text-brand-light font-heading mb-2 italic">Delete Generation Group?</h3>
-            <p className="text-sm text-brand-grey mb-8">This will permanently remove the entire group of variations for <br/><span className="font-bold text-brand-dark dark:text-brand-light italic">"{selectedGroup[0].fields?.Topic}"</span>. This action cannot be undone.</p>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <button 
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="py-3 rounded-xl border border-brand-light-grey dark:border-brand-dark/20 text-sm font-bold text-brand-grey hover:bg-brand-light-grey dark:hover:bg-white/5 transition-all"
-                disabled={isUpdating}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => handleDeleteGroup(selectedGroup[0].fields?.RequestId)}
-                className="py-3 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-600 shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center gap-2"
-                disabled={isUpdating}
-              >
-                {isUpdating ? <Loader2 size={18} className="animate-spin" /> : "Delete Everything"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

@@ -1,45 +1,44 @@
 import type { Metadata } from "next";
-import { Outfit, Manrope } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/components/common/AuthContext";
 import { ThemeProvider } from "@/components/common/ThemeContext";
 import { LayoutProvider } from "@/components/common/LayoutContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 
-const outfit = Outfit({
+const inter = Inter({ 
   subsets: ["latin"],
-  variable: "--font-heading",
-  display: "swap",
+  variable: '--font-body',
 });
 
-const manrope = Manrope({
+const outfit = Outfit({
   subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
+  variable: '--font-heading',
 });
 
 export const metadata: Metadata = {
-  title: "Fetemi | Soft Dashboard",
-  description: "Automate your content pipeline seamlessly.",
+  title: "Fetemi | Content Automation Platform",
+  description: "Next-generation content automation for LinkedIn, X, and Email.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" className={`${outfit.variable} ${manrope.variable}`} suppressHydrationWarning>
-      <body className="antialiased min-h-screen" suppressHydrationWarning>
-        <ThemeProvider>
-          <AuthProvider>
+    <html lang="en" suppressHydrationWarning className={cn(inter.variable, outfit.variable)}>
+      <body suppressHydrationWarning className="antialiased min-h-screen">
+        <AuthProvider>
+          <ThemeProvider>
             <LayoutProvider>
               <ProtectedRoute>
                 {children}
               </ProtectedRoute>
             </LayoutProvider>
-          </AuthProvider>
-        </ThemeProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

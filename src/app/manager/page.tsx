@@ -1,23 +1,28 @@
+"use client";
+
 import Sidebar from "@/components/common/Sidebar";
 import Header from "@/components/common/Header";
-import ManagerDashboardContent from "@/components/manager/ManagerDashboardContent";
-import WelcomeBanner from "@/components/common/WelcomeBanner";
+import DynamicDashboard from "@/components/dashboard/DynamicDashboard";
+import { useLayout } from "@/components/common/LayoutContext";
+import { cn } from "@/lib/utils";
 
 export default function ManagerDashboard() {
+  const { sidebarCollapsed } = useLayout();
+
   return (
-    <div className="flex min-h-screen bg-brand-light dark:bg-brand-dark">
+    <div className="flex min-h-screen bg-brand-light dark:bg-brand-dark overflow-hidden">
       <Sidebar role="manager" />
       
-      <main className="flex-1 lg:pl-[20rem] transition-all duration-300">
+      <main className={cn(
+        "flex-1 transition-all duration-500 ease-in-out",
+        sidebarCollapsed ? "lg:pl-24" : "lg:pl-[20rem]"
+      )}>
         <Header />
         
-        <div className="mx-auto max-w-7xl p-6 lg:p-10">
-          <div className="mb-10">
-            <WelcomeBanner subtitle="Oversee the entire content pipeline, manage team performance, and optimize publishing strategy." />
-          </div>
-          
-          <ManagerDashboardContent />
-        </div>
+        <DynamicDashboard 
+          role="manager" 
+          subtitle="Oversee the entire content pipeline, manage team performance, and optimize publishing strategy." 
+        />
       </main>
     </div>
   );

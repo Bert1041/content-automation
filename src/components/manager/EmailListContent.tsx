@@ -229,7 +229,7 @@ export default function EmailListContent() {
                        </div>
                     </td>
                     <td className="px-8 py-6 text-xs text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">
-                       {entry.addedAt ? new Date(entry.addedAt).toLocaleDateString() : 'N/A'}
+                       {entry.addedAt ? new Date(entry.addedAt).toLocaleDateString("en-US") : 'N/A'}
                     </td>
                     <td className="px-8 py-6 text-right">
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

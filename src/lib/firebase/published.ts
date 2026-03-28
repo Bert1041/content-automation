@@ -1,36 +1,45 @@
-import { app } from "./config";
+import { db } from "./config";
 import { 
-  getFirestore, 
   collection, 
   addDoc, 
-  serverTimestamp,
-  updateDoc,
-  doc
+  serverTimestamp
 } from "firebase/firestore";
-import { Draft as AirtableDraft } from "../api/n8n";
-
-const db = getFirestore(app);
 
 /**
  * Persist approved content to Firebase for long-term records and analytics
  */
-export async function savePublishedContent(draft: AirtableDraft, managerEmail: string) {
+export interface PublishedContentData {
+  draftId: string;
+  requestId: string;
+  topic: string;
+  content: string;
+  platform: string;
+  authorEmail: string;
+  managerEmail: string;
+  publishedAt?: string;
+  generatedAt?: string;
+}
+
+/**
+ * Persist approved content to Firebase for long-term records and analytics
+ */
+export async function savePublishedContent(data: PublishedContentData) {
   try {
     const publishedRef = collection(db, "published_content");
     
     const docData = {
-      airtableId: draft.id,
-      requestId: draft.fields.RequestId,
-      topic: draft.fields.Topic,
-      content: draft.fields.Content, // Note: This should already be parsed or we parse it here
-      platform: draft.fields.Platform,
-      authorEmail: draft.fields.AuthorEmail,
-      managerEmail: managerEmail,
-      publishedAt: serverTimestamp(),
+      airtableId: data.draftId,
+      requestId: data.requestId,
+      topic: data.topic,
+      content: data.content,
+      platform: data.platform,
+      authorEmail: data.authorEmail,
+      managerEmail: data.managerEmail,
+      publishedAt: data.publishedAt ? new Date(data.publishedAt) : serverTimestamp(),
       status: "Published",
       metadata: {
-        generatedAt: draft.fields.GeneratedAt,
-        variantIndex: draft.fields.RequestId === draft.id ? 0 : 1 // Simple logic to track variants
+        generatedAt: data.generatedAt || new Date().toISOString(),
+        variantIndex: data.requestId === data.draftId ? 0 : 1
       }
     };
 
@@ -62,5 +71,31 @@ export async function scheduleContentInFirebase(draft: AirtableDraft, publishDat
   } catch (error) {
     console.error("Error scheduling in Firebase:", error);
     throw error;
+  }
+}
+
+/**
+ * Fetch all published content for a manager or all if role is manager
+ */
+export async function fetchPublishedContent(userEmail: string, role?: string) {
+  try {
+    const { getDocs, query, where, orderBy } = await import("firebase/firestore");
+    const publishedRef = collection(db, "published_content");
+    
+    // Managers see ALL published content for oversight
+    const q = (role === "manager") 
+      ? query(publishedRef, orderBy("publishedAt", "desc"))
+      : query(publishedRef, where("authorEmail", "==", userEmail), orderBy("publishedAt", "desc"));
+      
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      publishedAt: doc.data().publishedAt?.toDate?.() || new Date(doc.data().publishedAt)
+    }));
+  } catch (error) {
+    console.error("Error fetching published content:", error);
+    return [];
   }
 }

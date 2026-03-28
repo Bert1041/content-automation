@@ -18,17 +18,17 @@ export default function AnalyticsPage() {
       )}>
         <Header />
         
-        <div className="mx-auto max-w-7xl p-10">
+        <div className="mx-auto max-w-7xl p-6 lg:p-10">
           <div className="mb-10 space-y-1">
             <h2 className="text-3xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading">
-              Analytics Dashboard
+              Content Analytics
             </h2>
             <p className="text-sm font-medium text-brand-grey font-body">
-              Track your content production metrics and pipeline efficiency in real-time.
+              Track your individual content production metrics and pipeline efficiency in real-time.
             </p>
           </div>
           
-          <AnalyticsContent />
+          <AnalyticsContent role="content-manager" />
         </div>
       </main>
     </div>

@@ -383,26 +383,33 @@ export default function CreateContentForm() {
           </div>
 
           <div className="grid gap-6">
-            {results.map((record: any) => {
+            {Array.isArray(results) && results.map((record: any) => {
+              if (!record || !record.fields) return null;
+              
               const { fields } = record;
-              let content = fields.Content;
+              const platform = fields.Platform || "Unknown";
+              const status = fields.Status || "Pending";
+              
+              let content = fields.Content || "";
               try {
-                const parsed = JSON.parse(fields.Content);
-                if (parsed.drafts && parsed.drafts[0]) {
-                  content = parsed.drafts[0].content;
+                if (fields.Content) {
+                  const parsed = JSON.parse(fields.Content);
+                  if (parsed.drafts && Array.isArray(parsed.drafts) && parsed.drafts[0]) {
+                    content = parsed.drafts[0].content || content;
+                  }
                 }
               } catch (e) {}
 
               return (
-                <div key={record.id} className="glass-card p-8 lg:p-10 group transition-all glass-card-hover">
+                <div key={record.id || Math.random().toString()} className="glass-card p-8 lg:p-10 group transition-all glass-card-hover">
                   <div className="mb-6 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-accent/10 text-brand-accent">
-                        {fields.Platform === "X (Twitter)" ? <Twitter size={18} /> : fields.Platform === "LinkedIn" ? <Linkedin size={18} /> : <Mail size={18} />}
+                        {platform === "X (Twitter)" ? <Twitter size={18} /> : platform === "LinkedIn" ? <Linkedin size={18} /> : <Mail size={18} />}
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-brand-dark dark:text-brand-light font-heading">{fields.Platform}</h4>
-                        <p className="text-[10px] uppercase font-bold text-slate-500 opacity-60">Status: {fields.Status}</p>
+                        <h4 className="text-sm font-bold text-brand-dark dark:text-brand-light font-heading">{platform}</h4>
+                        <p className="text-[10px] uppercase font-bold text-slate-500 opacity-60">Status: {status}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

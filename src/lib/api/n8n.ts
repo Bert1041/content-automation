@@ -18,6 +18,7 @@ export interface Draft {
 const fetchN8nInternal = async (url: string, options: RequestInit = {}) => {
   const headers = {
     "Content-Type": "application/json",
+    "X-Api-Key": process.env.NEXT_PUBLIC_N8N_API_KEY || "",
     ...options.headers,
   };
 
@@ -44,25 +45,35 @@ const fetchN8n = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${N8N_WEBHOOK_BASE}${endpoint}`;
   const response = await fetchN8nInternal(url, options);
 
-  if (!response.ok) {
-    console.error(`[n8n] Error Response (${response.status}):`, response.statusText);
-    throw new Error(`n8n webhook error: ${response.statusText}`);
-  }
-
   // Handle No Content responses
   if (response.status === 204) {
      return true;
   }
 
   const text = await response.text();
-  if (!text) return true;
-
+  let data: any;
   try {
-    return JSON.parse(text);
+    data = text ? JSON.parse(text) : null;
   } catch (e) {
-    console.error("Failed to parse n8n response as JSON:", text);
-    return text;
+    data = text;
   }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[n8n] Response from ${endpoint}:`, data);
+  }
+
+  if (!response.ok) {
+    // Resilience: If n8n returns an error code but the body says success, we proceed
+    if (data && typeof data === 'object' && data.success === true) {
+      console.warn(`[n8n] Warning: Received ${response.status} but body indicates success. Proceeding.`);
+      return data;
+    }
+    
+    console.error(`[n8n] Error Response (${response.status}):`, text || response.statusText);
+    throw new Error(data?.message || `n8n webhook error: ${response.statusText}`);
+  }
+
+  return data || true;
 };
 
 export const n8nApi = {
@@ -147,8 +158,12 @@ export const n8nApi = {
    * Fetches for the user's personal content manager dashboard.
    */
   fetchDrafts: async (userEmail: string): Promise<Draft[]> => {
-    return fetchN8n(`/drafts?email=${encodeURIComponent(userEmail)}`, {
-      method: "GET",
+    return fetchN8n("/drafts-manager", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "read",
+        userEmail: userEmail
+      })
     });
   },
 
@@ -169,6 +184,7 @@ export const n8nApi = {
     displayName: string;
     role: string;
     temporaryPassword?: string;
+    apiKey?: string; // Added API key support
   }) => {
     return fetchN8n("/send-invite-email", {
       method: "POST",
@@ -181,16 +197,23 @@ export const n8nApi = {
    */
   updateDraft: async (payload: {
     id: string;
-    fields: {
+    fields?: {
       Content?: string;
       Status?: string;
       Topic?: string;
     };
+    drafts?: Array<{
+      platform: string;
+      content: string;
+    }>;
     userEmail: string;
   }) => {
-    return fetchN8n("/update-draft", {
+    return fetchN8n("/drafts-manager", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        action: "update"
+      }),
     });
   },
 
@@ -202,9 +225,12 @@ export const n8nApi = {
     requestId?: string;
     userEmail: string;
   }) => {
-    return fetchN8n("/delete-draft", {
+    return fetchN8n("/drafts-manager", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        action: "delete"
+      }),
     });
   },
 

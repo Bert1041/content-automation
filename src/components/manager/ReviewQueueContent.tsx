@@ -38,7 +38,8 @@ export default function ReviewQueueContent() {
     try {
       const data = await n8nApi.fetchReviewQueue(user.email);
       const draftsArray = Array.isArray(data) ? data : (data as any)?.records || [];
-      setDrafts(draftsArray);
+      // Filter out empty objects (n8n returns [{}] when no results are found)
+      setDrafts(draftsArray.filter((d: any) => d && Object.keys(d).length > 0));
     } catch (err) {
       console.error("Failed to fetch review queue:", err);
       setError(err instanceof Error ? err.message : "Connection error to n8n");
@@ -54,7 +55,7 @@ export default function ReviewQueueContent() {
   const groupedDrafts = useMemo(() => {
     const groups: Record<string, AirtableDraft[]> = {};
     drafts.forEach(draft => {
-      const requestId = draft.fields?.RequestId || draft.id;
+      const requestId = draft.fields?.RequestId || (draft as any).RequestId || draft.id;
       if (!groups[requestId]) groups[requestId] = [];
       groups[requestId].push(draft);
     });
@@ -64,18 +65,20 @@ export default function ReviewQueueContent() {
   const filteredGroups = useMemo(() => {
     return groupedDrafts.filter(group => {
       const firstDraft = group[0];
-      if (!firstDraft?.fields) return false;
+      const fields = firstDraft?.fields || firstDraft || {} as any;
       
-      const topic = (firstDraft.fields.Topic || "").toLowerCase();
+      const topic = (fields.Topic || "").toLowerCase();
       const query = searchQuery.toLowerCase();
       
-      const matchesSearch = topic.includes(query) || group.some(d => 
-        (d.fields?.Platform || "").toLowerCase().includes(query)
-      );
+      const matchesSearch = topic.includes(query) || group.some(d => {
+        const dFields = d.fields || d || {};
+        return (dFields.Platform || "").toLowerCase().includes(query);
+      });
       
-      const matchesStatus = statusFilter === "All" || group.some(d => 
-        (d.fields?.Status || "").toLowerCase() === statusFilter.toLowerCase()
-      );
+      const matchesStatus = statusFilter === "All" || group.some(d => {
+        const dFields = d.fields || d || {};
+        return (dFields.Status || "").toLowerCase() === statusFilter.toLowerCase();
+      });
       
       return matchesSearch && matchesStatus;
     });
@@ -171,87 +174,108 @@ export default function ReviewQueueContent() {
       {/* 2. Drafts Gallery */}
       <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
          {filteredGroups.length > 0 ? (
-           filteredGroups.map((group) => {
-             const firstDraft = group[0];
-             const platforms = group.map(d => d.fields?.Platform || "");
-             const statuses = group.map(d => d.fields?.Status || "");
-             
-             // Group Status logic
-             const isPending = statuses.some(s => s === "Pending Review");
-             const isRevision = statuses.some(s => s === "Revision Required");
-             const isRejected = statuses.every(s => s === "Rejected");
-             const isApproved = statuses.every(s => s === "Approved");
-             
-             const displayStatus = isPending ? "Pending Review" : 
-                                  isRevision ? "Revision Required" :
-                                  isApproved ? "Approved" : 
-                                  isRejected ? "Rejected" : statuses[0];
+          filteredGroups.map((group) => {
+            const firstDraft = group[0];
+            const fields = firstDraft?.fields || firstDraft || {} as any;
+            const platforms = group.map(d => (d.fields || d || {} as any).Platform || "");
+            const statuses = group.map(d => (d.fields || d || {} as any).Status || "");
+            
+            // Group Status logic - robust case-insensitive checks
+            const isPending = statuses.some(s => s?.trim().toLowerCase() === "pending review");
+            const isRevision = statuses.some(s => s?.trim().toLowerCase() === "revision required");
+            const isRejected = statuses.every(s => s?.trim().toLowerCase() === "rejected");
+            const isApproved = statuses.every(s => s?.trim().toLowerCase() === "approved");
+            
+            const displayStatus = isPending ? "Pending Review" : 
+                                 isRevision ? "Revision Required" :
+                                 isApproved ? "Approved" : 
+                                 isRejected ? "Rejected" : (statuses[0] || "Unknown");
 
-             return (
+            const isClickable = displayStatus.toLowerCase() === "pending review";
+
+            const cardContent = (
+              <div className="flex flex-col h-full">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-brand-light-grey flex items-center justify-center text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-brand-light">
+                     {group.length}
+                  </div>
+                   <div className="space-y-0.5">
+                     <p className="text-xs font-bold text-brand-dark dark:text-brand-light font-heading">Group Request</p>
+                      <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 font-body uppercase tracking-wider">
+                       {fields.CreationDate || fields.GeneratedAt ? new Date(fields.CreationDate || fields.GeneratedAt || "").toLocaleDateString("en-US") : "Recently"}
+                      </p>
+                   </div>
+                </div>
+
+                <h4 className="mb-8 text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase leading-tight group-hover:text-brand-orange transition-colors line-clamp-2">
+                  {fields.Topic}
+                </h4>
+
+                <div className="mt-auto space-y-6">
+                   {/* Platforms */}
+                   <div className="flex items-center justify-between">
+                      <div className="flex gap-2">
+                          {platforms.some(p => p.includes("LinkedIn")) && (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20 bg-white dark:bg-white/5">
+                               <Linkedin size={14} className="text-[#0077b5]" />
+                            </div>
+                          )}
+                          {platforms.some(p => p.includes("Twitter")) && (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20 bg-white dark:bg-white/5">
+                               <Twitter size={14} className="text-[#1DA1F2]" />
+                            </div>
+                          )}
+                          {platforms.some(p => p.includes("Email")) && (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20 bg-white dark:bg-white/5">
+                               <Mail size={14} className="text-slate-400" />
+                            </div>
+                          )}
+                      </div>
+                       <span className={cn(
+                         "text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg",
+                         displayStatus === "Approved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400" :
+                         displayStatus === "Rejected" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400" :
+                         displayStatus === "Revision Required" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" :
+                         "bg-brand-orange/10 text-orange-700 dark:bg-brand-orange/20 dark:text-brand-orange"
+                       )}>
+                         {displayStatus}
+                       </span>
+                   </div>
+
+                   {/* Dates */}
+                    <div className="flex items-center justify-between border-t border-brand-light-grey pt-6 dark:border-brand-dark/20 text-slate-500 dark:text-slate-500">
+                       <div className="flex items-center gap-2">
+                          <Calendar size={14} />
+                          <span className="text-[10px] font-bold uppercase tracking-wider font-heading">Schedule Review</span>
+                       </div>
+                     <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                   </div>
+                </div>
+              </div>
+            );
+
+            return isClickable ? (
               <Link 
-                 key={firstDraft.fields?.RequestId || firstDraft.id} 
+                 key={fields.RequestId || firstDraft.id} 
                  href={`/manager/review/${firstDraft.id}`}
                  className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-brand-light-grey bg-white p-8 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-brand-dark/10 dark:border-brand-dark/20 dark:bg-white/5"
               >
-                 <div className="mb-6 flex items-center gap-3">
-                    <div className="h-10 w-10 shrink-0 rounded-full bg-brand-light-grey flex items-center justify-center text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-brand-light">
-                       {group.length}
-                    </div>
-                     <div className="space-y-0.5">
-                       <p className="text-xs font-bold text-brand-dark dark:text-brand-light font-heading">Group Request</p>
-                       <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 font-body uppercase tracking-wider">
-                         {firstDraft.fields.CreationDate || firstDraft.fields.GeneratedAt ? new Date(firstDraft.fields.CreationDate || firstDraft.fields.GeneratedAt || "").toLocaleDateString() : "Recently"}
-                       </p>
-                     </div>
-                 </div>
-
-                 <h4 className="mb-8 text-xl font-semibold tracking-tight text-brand-dark dark:text-brand-light font-heading uppercase leading-tight group-hover:text-brand-orange transition-colors line-clamp-2">
-                   {firstDraft.fields.Topic}
-                 </h4>
-
-                 <div className="mt-auto space-y-6">
-                    {/* Platforms */}
-                    <div className="flex items-center justify-between">
-                       <div className="flex gap-2">
-                           {platforms.some(p => p.includes("LinkedIn")) && (
-                             <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20 bg-white dark:bg-white/5">
-                                <Linkedin size={14} className="text-[#0077b5]" />
-                             </div>
-                           )}
-                           {platforms.some(p => p.includes("Twitter")) && (
-                             <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20 bg-white dark:bg-white/5">
-                                <Twitter size={14} className="text-[#1DA1F2]" />
-                             </div>
-                           )}
-                           {platforms.some(p => p.includes("Email")) && (
-                             <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-light-grey dark:border-brand-dark/20 bg-white dark:bg-white/5">
-                                <Mail size={14} className="text-slate-400" />
-                             </div>
-                           )}
-                       </div>
-                        <span className={cn(
-                          "text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg",
-                          displayStatus === "Approved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400" :
-                          displayStatus === "Rejected" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400" :
-                          displayStatus === "Revision Required" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" :
-                          "bg-brand-orange/10 text-orange-700 dark:bg-brand-orange/20 dark:text-brand-orange"
-                        )}>
-                          {displayStatus}
-                        </span>
-                    </div>
-
-                    {/* Dates */}
-                     <div className="flex items-center justify-between border-t border-brand-light-grey pt-6 dark:border-brand-dark/20 text-slate-500 dark:text-slate-500">
-                        <div className="flex items-center gap-2">
-                           <Calendar size={14} />
-                           <span className="text-[10px] font-bold uppercase tracking-wider font-heading">Schedule Review</span>
-                        </div>
-                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                    </div>
-                 </div>
+                 {cardContent}
               </Link>
+            ) : (
+              <div 
+                 key={fields.RequestId || firstDraft.id} 
+                 className="relative flex flex-col overflow-hidden rounded-[2.5rem] border border-brand-light-grey bg-white/50 p-8 grayscale-[1] opacity-60 dark:border-brand-dark/20 dark:bg-white/5 cursor-not-allowed group"
+              >
+                 {cardContent}
+                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/10 opacity-0 transition-opacity hover:opacity-100 rounded-[2.5rem]">
+                    <span className="bg-brand-dark/80 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white shadow-2xl backdrop-blur-md rounded-full">
+                       Review Finalized
+                    </span>
+                 </div>
+              </div>
             );
-           })
+          })
          ) : (
            <div className="col-span-full flex h-64 flex-col items-center justify-center gap-4 rounded-[2.5rem] border-2 border-dashed border-brand-light-grey dark:border-brand-dark/20 bg-brand-light/20 dark:bg-white/5">
               <Database className="h-8 w-8 text-slate-400" />

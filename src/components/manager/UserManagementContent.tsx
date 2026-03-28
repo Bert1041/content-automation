@@ -164,7 +164,7 @@ export default function UserManagementContent() {
                           </div>
                            <div className="flex flex-col">
                              <span className="text-sm font-medium text-brand-dark dark:text-brand-light">{user.displayName || "Unknown"}</span>
-                             <span className="text-[11px] text-slate-600 dark:text-slate-400">{user.email}</span>
+                             <span className="text-[11px] text-slate-700 dark:text-slate-300 transition-colors uppercase font-bold tracking-tight">{user.email}</span>
                            </div>
                        </div>
                     </td>
@@ -187,7 +187,7 @@ export default function UserManagementContent() {
                           {!user.disabled ? "Active" : "Disabled"}
                        </div>
                     </td>
-                     <td className="px-8 py-6 text-xs text-slate-600 dark:text-slate-500 font-bold uppercase tracking-widest">
+                     <td className="px-8 py-6 text-xs text-slate-700 dark:text-slate-300 font-bold uppercase tracking-widest">
                        {user.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'N/A'}
                      </td>
                     <td className="px-8 py-6 text-right">
@@ -227,41 +227,41 @@ export default function UserManagementContent() {
  
                  <div className="space-y-6">
                     <div className="space-y-3">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500 font-heading">Full Name</label>
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-300 font-heading">Full Name</label>
                     <input 
                       type="text" 
                       placeholder="John Doe" 
                       value={inviteName}
                       onChange={(e) => setInviteName(e.target.value)}
-                      className="w-full rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 border border-transparent" 
+                      className="w-full rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 dark:text-white border border-transparent shadow-inner" 
                     />
                  </div>
                     <div className="space-y-3">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500 font-heading">Email Address</label>
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-300 font-heading">Email Address</label>
                     <input 
                       type="email" 
                       placeholder="john@company.com" 
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
-                      className="w-full rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 border border-transparent" 
+                      className="w-full rounded-2xl bg-brand-light px-6 py-4 text-sm font-bold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-orange dark:bg-white/5 dark:text-white border border-transparent shadow-inner" 
                     />
                  </div>
                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-grey font-heading">User Role</label>
+                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-300 font-heading">User Role</label>
                     <div className="grid grid-cols-2 gap-4">
                         <button 
                           onClick={() => setInviteRole("Content Manager")}
                           className={cn("rounded-2xl border-2 p-4 text-center transition-all", inviteRole === "Content Manager" ? "border-brand-orange bg-brand-orange/5" : "border-brand-light-grey hover:border-brand-dark dark:border-brand-dark/20")}
                         >
-                           <p className={cn("text-xs font-black uppercase tracking-widest font-heading", inviteRole === "Content Manager" ? "text-brand-dark dark:text-brand-light" : "text-slate-500")}>Content Manager</p>
-                           <p className="text-[9px] font-bold text-slate-500 mt-1">Create & Edit content</p>
+                           <p className={cn("text-xs font-black uppercase tracking-widest font-heading", inviteRole === "Content Manager" ? "text-brand-dark dark:text-brand-light" : "text-slate-500 dark:text-slate-500")}>Content Manager</p>
+                           <p className={cn("text-[9px] font-bold mt-1", inviteRole === "Content Manager" ? "text-slate-600 dark:text-slate-400" : "text-slate-400 dark:text-slate-600")}>Create & Edit content</p>
                         </button>
                         <button 
                           onClick={() => setInviteRole("Manager")}
                           className={cn("rounded-2xl border-2 p-4 text-center transition-all", inviteRole === "Manager" ? "border-brand-orange bg-brand-orange/5" : "border-brand-light-grey hover:border-brand-dark dark:border-brand-dark/20")}
                         >
-                           <p className={cn("text-xs font-black uppercase tracking-widest font-heading", inviteRole === "Manager" ? "text-brand-dark dark:text-brand-light" : "text-slate-500")}>Manager</p>
-                           <p className="text-[9px] font-bold text-slate-500 mt-1">Full oversight & Rules</p>
+                           <p className={cn("text-xs font-black uppercase tracking-widest font-heading", inviteRole === "Manager" ? "text-brand-dark dark:text-brand-light" : "text-slate-500 dark:text-slate-500")}>Manager</p>
+                           <p className={cn("text-[9px] font-bold mt-1", inviteRole === "Manager" ? "text-slate-600 dark:text-slate-400" : "text-slate-400 dark:text-slate-600")}>Full oversight & Rules</p>
                         </button>
                     </div>
                  </div>

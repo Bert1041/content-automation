@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   LayoutGrid,
   List as ListIcon,
@@ -39,6 +39,7 @@ import { useLayout } from "@/components/common/LayoutContext";
 
 export default function ManagerReviewDetail() {
   const { id } = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const { sidebarCollapsed } = useLayout();
   const [groupDrafts, setGroupDrafts] = useState<AirtableDraft[]>([]);
@@ -52,10 +53,20 @@ export default function ManagerReviewDetail() {
   const [imagePlacements, setImagePlacements] = useState<Record<string, "banner" | "bottom" | "attach">>({});
   const [useImageGen, setUseImageGen] = useState<Record<string, boolean>>({}); // { Platform: Generate Image? }
   const [publishType, setPublishType] = useState<"immediate" | "schedule">("immediate");
-  const [publishDate, setPublishDate] = useState("");
+  const [publishDate, setPublishDate] = useState(() => {
+    // Default to +2 hours from now in YYYY-MM-DDTHH:MM format
+    const future = new Date();
+    future.setHours(future.getHours() + 2);
+    return new Date(future.getTime() - (future.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"content" | "preview">("content");
+
+  const getMinDateTime = () => {
+    const now = new Date();
+    return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -127,9 +138,16 @@ export default function ManagerReviewDetail() {
       return;
     }
 
-    if (publishType === "schedule" && !publishDate) {
-      alert("Please select a valid scheduled date.");
-      return;
+    if (publishType === "schedule") {
+      if (!publishDate) {
+        alert("Please select a valid scheduled date.");
+        return;
+      }
+      const selectedDate = new Date(publishDate);
+      if (selectedDate < new Date()) {
+        alert("The selected publication window is in the past. Please choose a future date and time.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -156,23 +174,62 @@ export default function ManagerReviewDetail() {
         })
       };
 
-      await n8nApi.submitBatchReview(payload);
+      const n8nResponse = await n8nApi.submitBatchReview(payload);
       
-      // Secondary Persistence: Save approved content to Firebase
+      // We check for success: false if the user added a response node, 
+      // or we proceed if it returns anything else (as n8n defaults to 200 OK)
+      if (n8nResponse && (n8nResponse as any).success === false) {
+        throw new Error((n8nResponse as any).message || "N8N processed the request but returned a failure status.");
+      }
+      
+      // Secondary Persistence: Save approved content to Firebase ONLY on success
       const approvedDrafts = groupDrafts.filter(d => selections[d.fields.Platform] === d.id && !revisionNotes[d.fields.Platform]);
+      
+      const { updateDraftInFirestore } = await import("@/lib/firebase/drafts");
+      
       for (const draft of approvedDrafts) {
-        await savePublishedContent({
-          draftId: draft.id,
-          content: draft.fields.Content,
-          platform: draft.fields.Platform,
-          topic: draft.fields.Topic,
-          publishedAt: publishType === "schedule" ? publishDate : new Date().toISOString(),
-          managerEmail: userEmail
-        });
+        try {
+          await savePublishedContent({
+            draftId: draft.id,
+            requestId: draft.fields.RequestId || (draft as any).RequestId || draft.id,
+            content: draft.fields.Content,
+            platform: draft.fields.Platform,
+            topic: draft.fields.Topic,
+            authorEmail: draft.fields.AuthorEmail || (draft as any).AuthorEmail || "unknown",
+            publishedAt: publishType === "schedule" ? publishDate : new Date().toISOString(),
+            generatedAt: draft.fields.CreationDate || (draft as any).GeneratedAt,
+            managerEmail: userEmail
+          });
+          
+          // Update draft status to Published in Firestore (Safe-guarded)
+          await updateDraftInFirestore(draft.id, { status: "Published" }).catch(e => {
+            console.warn(`[Firestore] Failed to update draft ${draft.id} status. Access may be restricted.`, e);
+          });
+        } catch (e) {
+          console.error(`[Archive] Failed to save content for ${draft.fields.Platform} to Published collection.`, e);
+          // We continue to other platforms even if one fails
+        }
+      }
+
+      // Also update statuses for rejected or revision drafts to keep everything in sync (Safe-guarded)
+      for (const draft of groupDrafts) {
+        const isApproved = selections[draft.fields.Platform] === draft.id && !revisionNotes[draft.fields.Platform];
+        if (!isApproved) {
+            const hasRevision = !!revisionNotes[draft.fields.Platform];
+            await updateDraftInFirestore(draft.id, { 
+                status: hasRevision ? "Revision" : "Rejected" 
+            }).catch(e => {
+                console.warn(`[Firestore] Status update failed for ${draft.fields.Platform}: ${e.message}`);
+            });
+        }
       }
 
       alert("Batch Success! All platforms synchronized and archived.");
-      window.location.href = "/manager/review";
+      
+      // small delay to let users read the alert/toast then navigate
+      setTimeout(() => {
+        router.push("/manager/review");
+      }, 500);
     } catch (err) {
       console.error("Batch Finalize Error:", err);
       alert("Failed to finalize batch review. Some updates may have failed.");
@@ -189,8 +246,8 @@ export default function ManagerReviewDetail() {
        <div className="flex h-96 flex-col items-center justify-center gap-6">
           <Loader2 className="h-12 w-12 animate-spin text-brand-orange" />
           <div className="text-center space-y-2">
-             <p className="text-lg font-black uppercase tracking-tighter text-slate-900 dark:text-white font-heading">Synchronizing with Pipeline</p>
-             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Fetching latest variants from Airtable...</p>
+             <p className="text-lg font-bold uppercase tracking-tight text-slate-900 dark:text-white font-heading">Synchronizing with Pipeline</p>
+             <p className="text-[10px] font-medium uppercase tracking-widest text-slate-500">Fetching latest variants from Airtable...</p>
           </div>
        </div>
     );
@@ -224,13 +281,13 @@ export default function ManagerReviewDetail() {
               </Link>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-2 rounded-full bg-brand-orange/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-brand-orange ring-1 ring-brand-orange/30">
+                  <span className="flex items-center gap-2 rounded-full bg-brand-orange/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-orange ring-1 ring-brand-orange/30">
                     <div className="h-1.5 w-1.5 rounded-full bg-brand-orange animate-pulse" />
                     Review Pipeline v5.0
                   </span>
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-white/40">{requestId || "BATCH_ID"}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-white/40">{requestId || "BATCH_ID"}</span>
                 </div>
-                <h1 className="text-5xl font-black tracking-tighter text-slate-900 dark:text-white font-heading">
+                <h1 className="text-5xl font-bold tracking-tight text-slate-900 dark:text-white font-heading">
                   {groupDrafts[0]?.fields.Topic}
                 </h1>
               </div>
@@ -247,7 +304,7 @@ export default function ManagerReviewDetail() {
               <React.Fragment key={s.id}>
                 <div className="group flex items-center gap-5">
                   <div className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-full text-xs font-black transition-all duration-500 shadow-lg",
+                    "flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold transition-all duration-500 shadow-lg",
                     currentStage === s.id 
                       ? "bg-brand-orange text-white ring-4 ring-brand-orange/20 scale-110" 
                       : "bg-slate-100 text-slate-400 ring-1 ring-slate-200 dark:bg-white/5 dark:text-white/20 dark:ring-white/5"
@@ -256,12 +313,12 @@ export default function ManagerReviewDetail() {
                   </div>
                   <div className="space-y-0.5">
                     <p className={cn(
-                      "text-[11px] font-black uppercase tracking-widest transition-all duration-500",
+                      "text-[11px] font-bold uppercase tracking-wider transition-all duration-500",
                       currentStage === s.id ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-white/20"
                     )}>
                       {s.label}
                     </p>
-                    <p className="text-[9px] font-bold text-slate-400 dark:text-white/10 uppercase tracking-tighter">Stage 0{idx + 1}</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-white/10 uppercase tracking-tight">Stage 0{idx + 1}</p>
                   </div>
                 </div>
                 {idx < 2 && (
@@ -283,8 +340,8 @@ export default function ManagerReviewDetail() {
                    <ShieldCheck size={24} />
                 </div>
                 <div className="space-y-4">
-                   <h4 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-100 font-heading">Stage 1: Platform Selection</h4>
-                   <ul className="grid gap-x-16 gap-y-3 text-[13px] font-bold text-slate-500 dark:text-slate-400 md:grid-cols-2">
+                   <h4 className="text-xl font-bold uppercase tracking-tight text-slate-900 dark:text-slate-100 font-heading">Stage 1: Platform Selection</h4>
+                   <ul className="grid gap-x-16 gap-y-3 text-[13px] font-medium text-slate-500 dark:text-slate-400 md:grid-cols-2">
                       <li className="flex items-start gap-3">
                          <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
                          <span>Pick your favorite version for each platform.</span>
@@ -313,8 +370,8 @@ export default function ManagerReviewDetail() {
                      {platform.includes("Email") && <Mail size={24} />}
                    </div>
                    <div className="space-y-1">
-                     <h2 className="text-3xl font-black tracking-tighter text-slate-900 dark:text-white font-heading">{platform}</h2>
-                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{drafts.length} Creative Variants</p>
+                     <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white font-heading">{platform}</h2>
+                     <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">{drafts.length} Creative Variants</p>
                    </div>
                  </div>
 
@@ -357,12 +414,12 @@ export default function ManagerReviewDetail() {
                                </div>
                                <div className="flex-1 space-y-4">
                                  <div className="space-y-1">
-                                   <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Manager Directives</h4>
-                                   <p className="text-[11px] font-bold text-slate-500">Request specific adjustments for this variant.</p>
+                                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Manager Directives</h4>
+                                   <p className="text-[11px] font-medium text-slate-500">Request specific adjustments for this variant.</p>
                                  </div>
                                  <textarea
                                    placeholder="Type here to request a revision (e.g. 'Make the tone more professional')..."
-                                   className="w-full min-h-[100px] rounded-2xl bg-white p-6 text-[13px] font-bold text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 transition-all focus:ring-2 focus:ring-amber-500"
+                                   className="w-full min-h-[100px] rounded-2xl bg-white p-6 text-[13px] font-medium text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 transition-all focus:ring-2 focus:ring-amber-500"
                                    onClick={(e) => e.stopPropagation()}
                                    value={revisionNotes[platform] || ""}
                                    onChange={(e) => handleUpdateNotes(platform, e.target.value)}
@@ -396,8 +453,8 @@ export default function ManagerReviewDetail() {
                     <Sparkles size={24} />
                  </div>
                  <div className="space-y-2">
-                    <h4 className="text-xl font-black uppercase tracking-tight font-heading">Stage 2: Media Refinement</h4>
-                    <p className="text-[13px] font-bold opacity-80">Finalize visual style for your selected platform winners.</p>
+                    <h4 className="text-xl font-bold uppercase tracking-tight font-heading">Stage 2: Media Refinement</h4>
+                    <p className="text-[13px] font-medium opacity-80">Finalize visual style for your selected platform winners.</p>
                  </div>
               </div>
            </div>
@@ -418,7 +475,7 @@ export default function ManagerReviewDetail() {
                             {platform.includes("Email") && <Mail size={20} />}
                           </div>
                           <div className="space-y-0.5">
-                             <h3 className="text-lg font-black tracking-tight dark:text-white font-heading">{platform} Winner</h3>
+                             <h3 className="text-lg font-bold tracking-tight dark:text-white font-heading">{platform} Winner</h3>
                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Validated for Sync</p>
                           </div>
                        </div>
@@ -435,16 +492,16 @@ export default function ManagerReviewDetail() {
                                       <AlertCircle size={24} />
                                    </div>
                                    <div className="space-y-1">
-                                      <p className="text-sm font-black uppercase tracking-tight text-slate-900 dark:text-white">Revision Mode Active</p>
-                                      <p className="text-[11px] font-bold text-slate-500">Images are disabled for variants marked for revision.</p>
+                                      <p className="text-sm font-bold uppercase tracking-tight text-slate-900 dark:text-white">Revision Mode Active</p>
+                                      <p className="text-[11px] font-medium text-slate-500">Images are disabled for variants marked for revision.</p>
                                    </div>
                                 </div>
                              ) : (
                                 <>
                                    <div className="flex items-center justify-between">
                                       <div className="space-y-1">
-                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Generate Custom Image</label>
-                                         <p className="text-[11px] font-bold text-slate-500">Use AI to create a unique visual for this post.</p>
+                                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Generate Custom Image</label>
+                                         <p className="text-[11px] font-medium text-slate-500">Use AI to create a unique visual for this post.</p>
                                       </div>
                                       <button 
                                         onClick={() => setUseImageGen(prev => ({ ...prev, [platform]: !prev[platform] }))}
@@ -463,7 +520,7 @@ export default function ManagerReviewDetail() {
                                    {useImageGen[platform] ? (
                                       <div className="space-y-4 animate-in zoom-in-95 duration-500">
                                          <div className="space-y-2 mt-6">
-                                            <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Visual Style Guide</h5>
+                                            <h5 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Visual Style Guide</h5>
                                             <textarea
                                               placeholder="E.g. 'Minimalist desk background, high contrast lighting, premium aesthetic'..."
                                               className="w-full min-h-[100px] rounded-2xl bg-white p-6 text-[13px] font-bold text-slate-900 focus:outline-none dark:bg-slate-900/50 dark:text-white border border-slate-200 dark:border-slate-800 transition-all focus:ring-2 focus:ring-emerald-500"
@@ -478,7 +535,7 @@ export default function ManagerReviewDetail() {
 
                                           {/* Placement Selection */}
                                           <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-white/5">
-                                             <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Positioning Strategy</h5>
+                                             <h5 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Positioning Strategy</h5>
                                              <div className="flex gap-2">
                                                 {[
                                                    { id: "banner", label: "Top Banner", icon: LayoutIcon },
@@ -489,7 +546,7 @@ export default function ManagerReviewDetail() {
                                                       key={pos.id}
                                                       onClick={() => setImagePlacements(prev => ({ ...prev, [platform]: pos.id as any }))}
                                                       className={cn(
-                                                         "flex flex-1 items-center justify-center gap-3 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest transition-all shadow-sm",
+                                                         "flex flex-1 items-center justify-center gap-3 rounded-xl py-3 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm",
                                                          imagePlacements[platform] === pos.id
                                                             ? "bg-slate-900 text-white dark:bg-emerald-500"
                                                             : "bg-white text-slate-500 hover:bg-slate-50 dark:bg-white/5 dark:text-slate-400 border border-slate-100 dark:border-slate-800"
@@ -504,7 +561,7 @@ export default function ManagerReviewDetail() {
                                       </div>
                                    ) : (
                                       <div className="flex flex-col items-center justify-center h-48 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-white/10 opacity-50">
-                                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No Image Required</p>
+                                         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No Image Required</p>
                                       </div>
                                    )}
                                 </>
@@ -526,7 +583,7 @@ export default function ManagerReviewDetail() {
                     <History size={24} />
                  </div>
                  <div className="space-y-2">
-                    <h4 className="text-xl font-black uppercase tracking-tight font-heading">Stage 3: Deployment Strategy</h4>
+                    <h4 className="text-xl font-bold uppercase tracking-tight font-heading">Stage 3: Deployment Strategy</h4>
                     <p className="text-[13px] font-bold opacity-80">Choose the heartbeat of this content batch.</p>
                  </div>
               </div>
@@ -536,8 +593,8 @@ export default function ManagerReviewDetail() {
               <div className="grid gap-16 md:grid-cols-2">
                  <div className="space-y-8">
                     <div className="space-y-2">
-                       <h3 className="text-2xl font-black tracking-tighter dark:text-white font-heading">Publishing Mode</h3>
-                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Set common sync strategy</p>
+                       <h3 className="text-2xl font-bold tracking-tight dark:text-white font-heading">Publishing Mode</h3>
+                       <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">Set common sync strategy</p>
                     </div>
                     
                     <div className="flex flex-col gap-3">
@@ -558,7 +615,7 @@ export default function ManagerReviewDetail() {
                                 <Zap size={18} />
                              </div>
                              <div className="text-left">
-                                <p className="text-sm font-black uppercase tracking-tight">Instant Sync</p>
+                                <p className="text-sm font-bold uppercase tracking-tight">Instant Sync</p>
                                 <p className="text-[10px] font-bold opacity-60">Deploy immediately to all channels</p>
                              </div>
                           </div>
@@ -582,7 +639,7 @@ export default function ManagerReviewDetail() {
                                 <History size={18} />
                              </div>
                              <div className="text-left">
-                                <p className="text-sm font-black uppercase tracking-tight">Prime Time Schedule</p>
+                                <p className="text-sm font-bold uppercase tracking-tight">Prime Time Schedule</p>
                                 <p className="text-[10px] font-bold opacity-60">Queue for optimal engagement window</p>
                              </div>
                           </div>
@@ -594,11 +651,12 @@ export default function ManagerReviewDetail() {
                  {publishType === "schedule" && (
                     <div className="space-y-8 animate-in slide-in-from-right-4 duration-700">
                        <div className="space-y-2">
-                          <h3 className="text-2xl font-black tracking-tighter dark:text-white font-heading">Window Selection</h3>
+                          <h3 className="text-2xl font-bold tracking-tighter dark:text-white font-heading">Window Selection</h3>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Target a specific date and time</p>
                        </div>
                        <input 
                          type="datetime-local" 
+                         min={getMinDateTime()}
                          className="w-full h-16 rounded-3xl bg-slate-50 px-8 text-sm font-bold text-slate-900 focus:outline-none dark:bg-white/5 dark:text-white border-2 border-slate-100 dark:border-white/10 focus:border-brand-orange"
                          value={publishDate}
                          onChange={(e) => setPublishDate(e.target.value)}
@@ -613,7 +671,7 @@ export default function ManagerReviewDetail() {
                        <ShieldCheck size={24} />
                     </div>
                     <div className="space-y-1">
-                       <h4 className="text-sm font-black uppercase tracking-tight dark:text-white">Validation Summary</h4>
+                       <h4 className="text-sm font-bold uppercase tracking-tight dark:text-white">Validation Summary</h4>
                        <p className="text-[11px] font-bold text-slate-500">
                           {platforms.length} Platforms • {Object.keys(useImageGen).filter(k => useImageGen[k]).length} AI Images • Strategy: {publishType.toUpperCase()}
                        </p>
@@ -635,18 +693,18 @@ export default function ManagerReviewDetail() {
             {/* Action Meta Info */}
             <div className="hidden items-center gap-6 md:flex">
               <div className="space-y-0.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic Stream</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Topic Stream</p>
                 <div className="flex items-center gap-3">
                   <div className="h-2 w-2 rounded-full bg-brand-orange animate-pulse" />
-                  <p className="text-[13px] font-black tracking-tight text-slate-900 dark:text-white font-heading">{groupDrafts[0]?.fields.Topic}</p>
+                  <p className="text-[13px] font-bold tracking-tight text-slate-900 dark:text-white font-heading">{groupDrafts[0]?.fields.Topic}</p>
                 </div>
               </div>
               <div className="h-10 w-[1px] bg-slate-200 dark:bg-white/10" />
               <div className="space-y-0.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Validation Status</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Validation Status</p>
                 <div className="flex items-center gap-3">
                   <p className={cn(
-                    "text-[13px] font-black tracking-tight transition-colors duration-500",
+                    "text-[13px] font-bold tracking-tight transition-colors duration-500",
                     isSelectionComplete ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                   )}>
                     {Object.keys(selections).length} / {platforms.length} Platforms Ready
@@ -659,8 +717,11 @@ export default function ManagerReviewDetail() {
           <div className="flex items-center gap-4">
              {currentStage !== "selection" && (
                 <button
-                   onClick={() => setCurrentStage(prev => prev === "deployment" ? "media" : "selection")}
-                   className="flex h-14 items-center gap-3 rounded-2xl bg-slate-100 px-8 text-[11px] font-black uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-200 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                   onClick={() => {
+                     setCurrentStage(prev => prev === "deployment" ? "media" : "selection");
+                     window.scrollTo({ top: 0, behavior: 'smooth' });
+                   }}
+                   className="flex h-14 items-center gap-3 rounded-2xl bg-slate-100 px-8 text-[11px] font-bold uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-200 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
                 >
                    <ReplyIcon size={16} />
                    Back
@@ -670,9 +731,12 @@ export default function ManagerReviewDetail() {
              {currentStage !== "deployment" ? (
                 <button
                   disabled={!isSelectionComplete}
-                  onClick={() => setCurrentStage(prev => prev === "selection" ? "media" : "deployment")}
+                  onClick={() => {
+                    setCurrentStage(prev => prev === "selection" ? "media" : "deployment");
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className={cn(
-                    "flex h-16 items-center gap-4 rounded-3xl px-12 transition-all duration-500 font-heading text-sm font-black uppercase tracking-widest",
+                    "flex h-16 items-center gap-4 rounded-3xl px-12 transition-all duration-500 font-heading text-sm font-bold uppercase tracking-widest",
                     isSelectionComplete 
                       ? "bg-slate-900 text-white shadow-xl hover:scale-[1.02] hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-900 dark:hover:bg-white/90" 
                       : "bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-white/5 dark:text-white/30"
@@ -686,7 +750,7 @@ export default function ManagerReviewDetail() {
                   disabled={isSubmitting || (publishType === "schedule" && !publishDate)}
                   onClick={batchFinalize}
                   className={cn(
-                    "flex h-16 items-center gap-4 rounded-3xl px-12 transition-all duration-500 font-heading text-sm font-black uppercase tracking-widest",
+                    "flex h-16 items-center gap-4 rounded-3xl px-12 transition-all duration-500 font-heading text-sm font-bold uppercase tracking-widest",
                     isSubmitting 
                       ? "bg-slate-100 text-slate-400 cursor-wait dark:bg-white/5 dark:text-white/30" 
                       : (publishType === "schedule" && !publishDate)
