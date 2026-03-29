@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
+import { getAdminAuth } from '@/lib/firebase/admin';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     const { email, password, displayName, role } = await req.json();
+    const adminAuth = await getAdminAuth();
     
     // Create the user
     const generatedPassword = password || Math.random().toString(36).slice(-8) + "A1!";

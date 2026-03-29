@@ -22,6 +22,7 @@ export default function UserManagementContent() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Invite form state
   const [inviteName, setInviteName] = useState("");
@@ -35,14 +36,22 @@ export default function UserManagementContent() {
 
   const fetchUsers = async () => {
     setLoading(true);
+    setError(null);
     try {
        const res = await fetch("/api/users");
        const data = await res.json();
+       
+       if (!res.ok) {
+         throw new Error(data.error || `Server error: ${res.status}`);
+       }
+
        if (data.users) {
           setUsers(data.users);
        }
-    } catch (e) {
+    } catch (e: unknown) {
+       const message = e instanceof Error ? e.message : "An unknown error occurred";
        console.error("Failed to fetch users:", e);
+       setError(message);
     } finally {
        setLoading(false);
     }

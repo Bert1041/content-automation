@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { getAuth, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,9 +11,27 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase App centrally
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+function getFirebaseApp(): FirebaseApp | null {
+  if (typeof window === "undefined" && !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+    return null;
+  }
+  
+  if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+    console.warn("Firebase Client API Key is missing.");
+    return null;
+  }
+
+  try {
+    return !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  } catch (error) {
+    console.error("Firebase initialization error:", error);
+    return null;
+  }
+}
+
+// Initialize components safely
+const app = getFirebaseApp();
+const auth = app ? getAuth(app) : null as unknown as Auth;
+const db = app ? getFirestore(app) : null as unknown as Firestore;
 
 export { app, auth, db };

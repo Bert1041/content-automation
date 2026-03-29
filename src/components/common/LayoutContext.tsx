@@ -6,21 +6,33 @@ interface LayoutContextType {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (value: boolean) => void;
   toggleSidebar: () => void;
+  isMobile: boolean;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
 export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Load state from local storage
+  // Load state from local storage and handle resize
   useEffect(() => {
     setMounted(true);
+    
+    // Initial check
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+
+    // Listen for resize
+    window.addEventListener("resize", checkMobile);
+
     const saved = localStorage.getItem("sidebar-collapsed");
     if (saved) {
       setSidebarCollapsed(saved === "true");
     }
+
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const toggleSidebar = () => {
@@ -34,7 +46,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
   // Prevent hydration mismatch by rendering a consistent initial state
   if (!mounted) {
     return (
-      <LayoutContext.Provider value={{ sidebarCollapsed: false, setSidebarCollapsed, toggleSidebar }}>
+      <LayoutContext.Provider value={{ sidebarCollapsed: false, setSidebarCollapsed, toggleSidebar, isMobile: false }}>
         <div className="opacity-0">
           {children}
         </div>
@@ -43,7 +55,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <LayoutContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, toggleSidebar }}>
+    <LayoutContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, toggleSidebar, isMobile }}>
       {children}
     </LayoutContext.Provider>
   );

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
+import { getAdminAuth } from '@/lib/firebase/admin';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const adminAuth = await getAdminAuth();
     const listUsersResult = await adminAuth.listUsers(1000);
     const users = listUsersResult.users.map((record) => ({
       uid: record.uid,
@@ -28,6 +31,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'User UID is required' }, { status: 400 });
     }
 
+    const adminAuth = await getAdminAuth();
     await adminAuth.deleteUser(uid);
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error: unknown) {
